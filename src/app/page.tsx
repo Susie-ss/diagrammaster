@@ -2,13 +2,26 @@
 
 import Link from "next/link";
 import { useAuth } from "@/components/ui/AuthProvider";
-import { ArrowRight, Brain, Workflow, Pencil, Cloud, Share2, Layers } from "lucide-react";
+import { ArrowRight, Brain, Workflow, Pencil, Cloud, Share2, Layers, Database } from "lucide-react";
 
 export default function Home() {
-  const { user } = useAuth();
+  const { user, configured } = useAuth();
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-white overflow-hidden">
+      {/* Setup banner */}
+      {!configured && (
+        <div className="bg-amber-500/10 border-b border-amber-500/20 px-6 py-3">
+          <div className="max-w-6xl mx-auto flex items-center gap-3 text-amber-200/90 text-sm">
+            <Database className="w-4 h-4 text-amber-400 shrink-0" />
+            <span>尚未配置 Supabase 数据库。登录/注册和云存储功能暂不可用。</span>
+            <a href="https://supabase.com" target="_blank" rel="noopener" className="text-amber-300 underline underline-offset-2 hover:text-amber-100 ml-auto shrink-0">
+              去配置 →
+            </a>
+          </div>
+        </div>
+      )}
+
       {/* Nav */}
       <nav className="relative z-10 border-b border-white/5">
         <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
@@ -24,11 +37,15 @@ export default function Home() {
               <Link href="/dashboard" className="h-9 px-4 bg-indigo-500 hover:bg-indigo-600 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5">
                 进入工作台 <ArrowRight className="w-4 h-4" />
               </Link>
-            ) : (
+            ) : configured ? (
               <>
                 <Link href="/auth/login" className="text-sm text-slate-300 hover:text-white transition-colors">登录</Link>
                 <Link href="/auth/register" className="h-9 px-4 bg-indigo-500 hover:bg-indigo-600 rounded-lg text-sm font-medium transition-colors">免费注册</Link>
               </>
+            ) : (
+              <Link href="/dashboard" className="h-9 px-4 bg-indigo-500 hover:bg-indigo-600 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5">
+                进入工作台 <ArrowRight className="w-4 h-4" />
+              </Link>
             )}
           </div>
         </div>
@@ -43,14 +60,16 @@ export default function Home() {
           涵盖思维导图、流程图、UML图、ER图、网络架构图，支持实时协作与云端存储
         </p>
         <div className="mt-10 flex gap-4 justify-center">
-          <Link href={user ? "/dashboard" : "/auth/register"}
+          <Link href={user || !configured ? "/dashboard" : "/auth/register"}
             className="h-12 px-8 bg-indigo-500 hover:bg-indigo-600 rounded-xl font-medium transition-all shadow-lg shadow-indigo-500/25 flex items-center gap-2">
             免费开始使用 <ArrowRight className="w-5 h-5" />
           </Link>
-          <Link href="/auth/login"
-            className="h-12 px-8 border border-slate-600/50 hover:border-slate-500 rounded-xl font-medium transition-colors text-slate-300">
-            已有账户
-          </Link>
+          {configured && !user && (
+            <Link href="/auth/login"
+              className="h-12 px-8 border border-slate-600/50 hover:border-slate-500 rounded-xl font-medium transition-colors text-slate-300">
+              已有账户
+            </Link>
+          )}
         </div>
       </section>
 

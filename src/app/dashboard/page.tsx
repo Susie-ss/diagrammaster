@@ -19,7 +19,7 @@ interface Project {
 }
 
 export default function DashboardPage() {
-  const { user, signOut, loading: authLoading } = useAuth();
+  const { user, signOut, loading: authLoading, configured } = useAuth();
   const router = useRouter();
   const supabase = createClient();
 
@@ -47,12 +47,14 @@ export default function DashboardPage() {
   }, [user, supabase]);
 
   useEffect(() => {
-    if (!authLoading && !user) router.push("/auth/login");
+    if (!authLoading && !user && configured) router.push("/auth/login");
     else if (user) fetchData();
-  }, [user, authLoading, router, fetchData]);
+    else if (!configured) { setLoading(false); }
+  }, [user, authLoading, router, fetchData, configured]);
 
   // Auto-refresh
   useEffect(() => {
+    if (!configured) return;
     const channel = supabase.channel("db-changes")
       .on("postgres_changes", { event: "*", schema: "public" }, () => fetchData())
       .subscribe();
