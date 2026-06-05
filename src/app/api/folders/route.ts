@@ -1,15 +1,16 @@
-import { createClient } from "@/lib/supabase";
+import { createServerDb } from "@/lib/db";
+import { getUserFromCookies } from "@/lib/auth";
 import { NextResponse } from "next/server";
 
 export async function GET() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getUserFromCookies();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { data, error } = await supabase
+  const db = createServerDb();
+  const { data, error } = await db
     .from("folders")
     .select("*")
-    .eq("user_id", user.id)
+    .eq("user_id", user.sub)
     .order("sort_order");
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -17,16 +18,16 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getUserFromCookies();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  const db = createServerDb();
   const body = await request.json();
   const { name, parent_id } = body;
 
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from("folders")
-    .insert({ name: name || "New Folder", parent_id: parent_id || null, user_id: user.id })
+    .insert({ name: name || "New Folder", parent_id: parent_id || null, user_id: user.sub })
     .select()
     .single();
 

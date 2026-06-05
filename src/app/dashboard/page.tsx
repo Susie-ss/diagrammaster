@@ -3,9 +3,8 @@
 import { useAuth } from "@/components/ui/AuthProvider";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
-import { Plus, Folder, FileText, MoreHorizontal, Trash2, Edit3, LogOut, Grid3X3, Search, ChevronRight, Home, Brain } from "lucide-react";
+import { Plus, Folder, FileText, MoreHorizontal, Trash2, Edit3, LogOut, Grid3X3, Search, ChevronRight, Home, User } from "lucide-react";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase-client";
 
 interface Folder {
   id: string; name: string; parent_id: string | null;
@@ -21,7 +20,6 @@ interface Project {
 export default function DashboardPage() {
   const { user, signOut, loading: authLoading, configured } = useAuth();
   const router = useRouter();
-  const supabase = createClient();
 
   const [folders, setFolders] = useState<Folder[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -33,63 +31,66 @@ export default function DashboardPage() {
   const [contextMenu, setContextMenu] = useState<{x: number; y: number; type: "folder"|"project"; id: string} | null>(null);
 
   const fetchData = useCallback(async () => {
-    if (!user) return;
     setLoading(true);
-
-    const [{ data: f }, { data: p }] = await Promise.all([
-      supabase.from("folders").select("*").order("sort_order"),
-      supabase.from("projects").select("*").order("updated_at", { ascending: false }),
-    ]);
-
-    setFolders(f || []);
-    setProjects(p || []);
+    try {
+      const [fRes, pRes] = await Promise.all([
+        fetch("/api/folders"),
+        fetch("/api/projects"),
+      ]);
+      if (fRes.ok) setFolders(await fRes.json());
+      if (pRes.ok) setProjects(await pRes.json());
+    } catch {}
     setLoading(false);
-  }, [user, supabase]);
+  }, []);
 
   useEffect(() => {
     if (!authLoading && !user && configured) router.push("/auth/login");
     else if (user) fetchData();
-    else if (!configured) { setLoading(false); }
+    else if (!configured) setLoading(false);
   }, [user, authLoading, router, fetchData, configured]);
 
-  // Auto-refresh
-  useEffect(() => {
-    if (!configured) return;
-    const channel = supabase.channel("db-changes")
-      .on("postgres_changes", { event: "*", schema: "public" }, () => fetchData())
-      .subscribe();
-
-    return () => { supabase.removeChannel(channel); };
-  }, [supabase, fetchData]);
+  const apiCall = async (url: string, options?: RequestInit) => {
+    const res = await fetch(url, options);
+    if (!res.ok) {
+      const data = await res.json();
+      throw new Error(data.error || "请求失败");
+    }
+    return res.json();
+  };
 
   const createFolder = async () => {
     if (!newFolderName.trim()) return;
-    await supabase.from("folders").insert({ name: newFolderName.trim(), user_id: user!.id, parent_id: selectedFolder });
+    await apiCall("/api/folders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: newFolderName.trim(), parent_id: selectedFolder }),
+    });
     setNewFolderName(""); setShowNewFolder(false);
     fetchData();
   };
 
   const deleteFolder = async (id: string) => {
-    await supabase.from("folders").delete().eq("id", id);
+    await apiCall(`/api/folders/${id}`, { method: "DELETE" }).catch(() => {});
     if (selectedFolder === id) setSelectedFolder(null);
     setContextMenu(null);
     fetchData();
   };
 
   const createProject = async (mode: string = "flowchart") => {
-    const { data } = await supabase.from("projects").insert({
-      name: "未命名图表",
-      user_id: user!.id,
-      folder_id: selectedFolder,
-      mode,
-      diagram_data: { nodes: [], conns: [], paths: [] },
-    }).select("id").single();
-
-    if (data) router.push(`/editor/${data.id}`);
+    const data = await apiCall("/api/projects", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: "未命名图表",
+        folder_id: selectedFolder,
+        mode,
+      }),
+    });
+    if (data?.id) router.push(`/editor/${data.id}`);
   };
 
   const deleteProject = async (id: string) => {
-    await supabase.from("projects").delete().eq("id", id);
+    await apiCall(`/api/projects/${id}`, { method: "DELETE" });
     setContextMenu(null);
     fetchData();
   };
@@ -97,8 +98,19 @@ export default function DashboardPage() {
   const renameItem = async (type: "folder"|"project", id: string) => {
     const name = prompt("新名称：");
     if (!name) return;
-    if (type === "folder") await supabase.from("folders").update({ name }).eq("id", id);
-    else await supabase.from("projects").update({ name }).eq("id", id);
+    if (type === "folder") {
+      await apiCall(`/api/folders/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+    } else {
+      await apiCall(`/api/projects/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+    }
     setContextMenu(null);
     fetchData();
   };
@@ -125,7 +137,6 @@ export default function DashboardPage() {
   };
 
   const folderPath = getFolderPath(selectedFolder);
-
   const modeLabels: Record<string, string> = { mindmap: "🧠 思维导图", flowchart: "📐 流程图", freedraw: "✏️ 自由绘图" };
 
   if (authLoading || loading) {
@@ -161,7 +172,8 @@ export default function DashboardPage() {
         </div>
 
         <div className="flex items-center gap-2 text-sm text-slate-400">
-          <span>{user?.email}</span>
+          <User className="w-4 h-4" />
+          <span>{user?.username}</span>
           <button onClick={signOut} className="p-2 hover:bg-slate-800 rounded-lg transition-colors" title="退出登录">
             <LogOut className="w-4 h-4" />
           </button>
@@ -213,7 +225,6 @@ export default function DashboardPage() {
 
         {/* Main Content */}
         <main className="flex-1 overflow-y-auto">
-          {/* Breadcrumb */}
           {selectedFolder && (
             <div className="px-6 py-3 border-b border-slate-800 flex items-center gap-1 text-sm">
               <button onClick={() => setSelectedFolder(null)} className="text-slate-400 hover:text-white transition-colors">全部</button>
@@ -227,7 +238,6 @@ export default function DashboardPage() {
             </div>
           )}
 
-          {/* New Folder Input */}
           {showNewFolder && (
             <div className="px-6 py-3 border-b border-slate-800 flex items-center gap-2">
               <input
@@ -243,27 +253,18 @@ export default function DashboardPage() {
             </div>
           )}
 
-          {/* Projects Grid */}
           <div className="p-6">
             <div className="flex items-center justify-between mb-6">
               <div>
                 <h2 className="text-lg font-semibold text-white">
                   {selectedFolder ? folders.find(f => f.id === selectedFolder)?.name || "文件夹" : "所有项目"}
                 </h2>
-                <p className="text-sm text-slate-500 mt-0.5">
-                  {filteredProjects.length} 个项目
-                </p>
+                <p className="text-sm text-slate-500 mt-0.5">{filteredProjects.length} 个项目</p>
               </div>
               <div className="flex gap-2">
-                <button onClick={() => createProject("flowchart")} className="h-9 px-4 border border-slate-700 hover:border-slate-600 rounded-lg text-sm text-slate-300 transition-colors">
-                  📐 流程图
-                </button>
-                <button onClick={() => createProject("mindmap")} className="h-9 px-4 border border-slate-700 hover:border-slate-600 rounded-lg text-sm text-slate-300 transition-colors">
-                  🧠 思维导图
-                </button>
-                <button onClick={() => createProject("freedraw")} className="h-9 px-4 border border-slate-700 hover:border-slate-600 rounded-lg text-sm text-slate-300 transition-colors">
-                  ✏️ 自由绘图
-                </button>
+                <button onClick={() => createProject("flowchart")} className="h-9 px-4 border border-slate-700 hover:border-slate-600 rounded-lg text-sm text-slate-300 transition-colors">📐 流程图</button>
+                <button onClick={() => createProject("mindmap")} className="h-9 px-4 border border-slate-700 hover:border-slate-600 rounded-lg text-sm text-slate-300 transition-colors">🧠 思维导图</button>
+                <button onClick={() => createProject("freedraw")} className="h-9 px-4 border border-slate-700 hover:border-slate-600 rounded-lg text-sm text-slate-300 transition-colors">✏️ 自由绘图</button>
               </div>
             </div>
 

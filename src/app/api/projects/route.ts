@@ -1,15 +1,16 @@
-import { createClient } from "@/lib/supabase";
+import { createServerDb } from "@/lib/db";
+import { getUserFromCookies } from "@/lib/auth";
 import { NextResponse } from "next/server";
 
 export async function GET() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getUserFromCookies();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { data, error } = await supabase
+  const db = createServerDb();
+  const { data, error } = await db
     .from("projects")
     .select("*")
-    .eq("user_id", user.id)
+    .eq("user_id", user.sub)
     .order("updated_at", { ascending: false });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -17,21 +18,21 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getUserFromCookies();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  const db = createServerDb();
   const body = await request.json();
   const { name, mode, folder_id, diagram_data } = body;
 
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from("projects")
     .insert({
       name: name || "Untitled",
       mode: mode || "flowchart",
       folder_id: folder_id || null,
       diagram_data: diagram_data || { nodes: [], conns: [], paths: [] },
-      user_id: user.id,
+      user_id: user.sub,
     })
     .select()
     .single();

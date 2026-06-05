@@ -1,28 +1,38 @@
-import { createClient } from "@/lib/supabase";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { jwtVerify } from "jose";
+
+const JWT_SECRET = new TextEncoder().encode(
+  process.env.JWT_SECRET || "dev-secret-change-in-production"
+);
+
+async function getUserFromRequest(request: NextRequest) {
+  try {
+    const token = request.cookies.get("dm_token")?.value;
+    if (!token) return null;
+    const { payload } = await jwtVerify(token, JWT_SECRET);
+    return { sub: payload.sub as string, username: payload.username as string };
+  } catch {
+    return null;
+  }
+}
 
 export async function proxy(request: NextRequest) {
-  // Skip auth if Supabase is not configured
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-    return NextResponse.next();
-  }
-
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-
   const { pathname } = request.nextUrl;
 
-  // Allow auth pages and API routes
+  // Always allow auth pages, API routes, static assets, and home page
   if (
     pathname.startsWith("/auth") ||
     pathname.startsWith("/api") ||
-    pathname === "/"
+    pathname === "/" ||
+    pathname.startsWith("/_next") ||
+    pathname.startsWith("/favicon")
   ) {
     return NextResponse.next();
   }
 
-  // Redirect to login if not authenticated
+  // Protect all other routes (dashboard, editor, etc.)
+  const user = await getUserFromRequest(request);
   if (!user) {
     const url = new URL("/auth/login", request.url);
     url.searchParams.set("redirect", pathname);
