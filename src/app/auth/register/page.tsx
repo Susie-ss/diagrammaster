@@ -34,20 +34,25 @@ export default function RegisterPage() {
 
     setLoading(true);
 
-    const { error: err } = await supabase.auth.signUp({
+    const { error: err, data } = await supabase.auth.signUp({
       email,
       password,
-      options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
-      },
     });
 
     if (err) {
       setError(err.message);
-    } else {
-      setSuccess("注册成功！请检查邮箱确认链接，或直接登录。");
-      setTimeout(() => router.push("/auth/login"), 3000);
+      setLoading(false);
+      return;
     }
+
+    // email confirmation disabled → session returned immediately
+    if (data.session) {
+      router.push("/dashboard");
+      return;
+    }
+
+    // email confirmation enabled → manual confirm needed
+    setSuccess("注册成功！请检查邮箱确认链接。");
     setLoading(false);
   };
 
@@ -78,7 +83,7 @@ export default function RegisterPage() {
           )}
 
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">邮箱</label>
+            <label className="block text-sm font-medium text-slate-300 mb-2">帐号（邮箱）</label>
             <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" required
               className="w-full h-11 bg-slate-900/50 border border-slate-600/50 rounded-lg px-4 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all" />
           </div>

@@ -66,7 +66,7 @@ function LoginForm() {
           )}
 
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">邮箱</label>
+            <label className="block text-sm font-medium text-slate-300 mb-2">帐号（邮箱）</label>
             <input
               type="email"
               value={email}
