@@ -26,16 +26,70 @@ export interface DiagramState {
 
 // ======================== CONSTANTS ========================
 const PALETTE = ["#ffffff","#f3f4f6","#e5e7eb","#d1d5db","#fecaca","#fed7aa","#fef3c7","#d1fae5","#bfdbfe","#ddd6fe","#fbcfe8","#ef4444","#f97316","#eab308","#22c55e","#3b82f6","#8b5cf6","#ec4899","#b91c1c","#c2410c","#a16207","#15803d","#1d4ed8","#6d28d9","#be185d","#1a1a2e","#374151","#4b5563"];
-const THEMES: Record<string,{fill:string;stroke:string;text:string;cc:string[]}> = {
-  indigo:{fill:"#e0e7ff",stroke:"#4f46e5",text:"#312e81",cc:["#e0e7ff","#dbeafe","#d1fae5","#fef3c7","#fce7f3","#e0f2fe","#ede9fe"]},
-  emerald:{fill:"#d1fae5",stroke:"#059669",text:"#064e3b",cc:["#d1fae5","#dbeafe","#e0e7ff","#fef3c7","#fce7f3","#e0f2fe","#ede9fe"]},
-  amber:{fill:"#fef3c7",stroke:"#d97706",text:"#78350f",cc:["#fef3c7","#ffedd5","#fce7f3","#e0e7ff","#d1fae5","#dbeafe","#ede9fe"]},
-  red:{fill:"#fecaca",stroke:"#dc2626",text:"#7f1d1d",cc:["#fecaca","#fed7aa","#fef3c7","#d1fae5","#dbeafe","#e0e7ff","#fce7f3"]},
-  violet:{fill:"#ede9fe",stroke:"#7c3aed",text:"#4c1d95",cc:["#ede9fe","#e0e7ff","#fce7f3","#d1fae5","#fef3c7","#dbeafe","#e0f2fe"]},
-  cyan:{fill:"#cffafe",stroke:"#0891b2",text:"#164e63",cc:["#cffafe","#e0f2fe","#ede9fe","#fef3c7","#fce7f3","#d1fae5","#e0e7ff"]},
-  pink:{fill:"#fce7f3",stroke:"#db2777",text:"#831843",cc:["#fce7f3","#ede9fe","#dbeafe","#d1fae5","#fef3c7","#ffe4e6","#e0e7ff"]},
-  slate:{fill:"#e2e8f0",stroke:"#475569",text:"#1e293b",cc:["#e2e8f0","#cbd5c1","#d1fae5","#fef3c7","#fce7f3","#e0e7ff","#cffafe"]}
+// ——— 思维导图主题系统 ———
+// 每个主题定义：7 层深度的填充/描边/文字色 + 连线色 + 网格色
+const MM_THEMES: Record<string, {
+  name: string; nameZh: string;
+  fills: string[]; strokes: string[]; texts: string[];
+  connStroke: string; gridColor: string;
+}> = {
+  "sky": {
+    name: "Sky", nameZh: "天空蓝",
+    fills: ["#e8f0fe","#ffffff","#ffffff","#ffffff","#ffffff","#ffffff","#ffffff"],
+    strokes: ["#4a90d9","#9ba5c0","#bcc3d8","#ccd2e5","#ccd2e5","#ccd2e5","#ccd2e5"],
+    texts: ["#0f172a","#1e293b","#334155","#334155","#334155","#334155","#334155"],
+    connStroke: "#9ba5c0", gridColor: "#e8ecf4",
+  },
+  "indigo": {
+    name: "Indigo", nameZh: "靛青紫",
+    fills: ["#ede9fe","#ffffff","#ffffff","#ffffff","#ffffff","#ffffff","#ffffff"],
+    strokes: ["#7c3aed","#a78bfa","#bcc3d8","#ccd2e5","#ccd2e5","#ccd2e5","#ccd2e5"],
+    texts: ["#2e1065","#1e293b","#334155","#334155","#334155","#334155","#334155"],
+    connStroke: "#a78bfa", gridColor: "#f0eeff",
+  },
+  "emerald": {
+    name: "Emerald", nameZh: "翡翠绿",
+    fills: ["#ecfdf5","#ffffff","#ffffff","#ffffff","#ffffff","#ffffff","#ffffff"],
+    strokes: ["#10b981","#6ee7b7","#bcc3d8","#ccd2e5","#ccd2e5","#ccd2e5","#ccd2e5"],
+    texts: ["#022c22","#1e293b","#334155","#334155","#334155","#334155","#334155"],
+    connStroke: "#6ee7b7", gridColor: "#ecf6f0",
+  },
+  "amber": {
+    name: "Amber", nameZh: "琥珀橙",
+    fills: ["#fff7ed","#ffffff","#ffffff","#ffffff","#ffffff","#ffffff","#ffffff"],
+    strokes: ["#f59e0b","#fbbf24","#bcc3d8","#ccd2e5","#ccd2e5","#ccd2e5","#ccd2e5"],
+    texts: ["#431407","#1e293b","#334155","#334155","#334155","#334155","#334155"],
+    connStroke: "#fbbf24", gridColor: "#faf5ec",
+  },
+  "rose": {
+    name: "Rose", nameZh: "玫瑰粉",
+    fills: ["#fff1f2","#ffffff","#ffffff","#ffffff","#ffffff","#ffffff","#ffffff"],
+    strokes: ["#f43f5e","#fda4af","#bcc3d8","#ccd2e5","#ccd2e5","#ccd2e5","#ccd2e5"],
+    texts: ["#4c0519","#1e293b","#334155","#334155","#334155","#334155","#334155"],
+    connStroke: "#fda4af", gridColor: "#fdf0f0",
+  },
+  "violet": {
+    name: "Violet", nameZh: "紫罗兰",
+    fills: ["#f5f3ff","#ffffff","#ffffff","#ffffff","#ffffff","#ffffff","#ffffff"],
+    strokes: ["#8b5cf6","#c4b5fd","#bcc3d8","#ccd2e5","#ccd2e5","#ccd2e5","#ccd2e5"],
+    texts: ["#2e1065","#1e293b","#334155","#334155","#334155","#334155","#334155"],
+    connStroke: "#c4b5fd", gridColor: "#f2efff",
+  },
+  "slate": {
+    name: "Slate", nameZh: "岩石灰",
+    fills: ["#f1f5f9","#ffffff","#ffffff","#ffffff","#ffffff","#ffffff","#ffffff"],
+    strokes: ["#64748b","#94a3b8","#bcc3d8","#ccd2e5","#ccd2e5","#ccd2e5","#ccd2e5"],
+    texts: ["#020617","#1e293b","#334155","#334155","#334155","#334155","#334155"],
+    connStroke: "#94a3b8", gridColor: "#eef0f4",
+  },
 };
+
+// ——— 参考图样式：白底 + 浅蓝灰描边 ———
+const NODE_STROKE = "#9ba5c0";  // 浅蓝灰描边
+const NODE_FILL = "#ffffff";    // 白色填充
+const NODE_TEXT = "#1e293b";    // 深色文字（slate-800，清晰可读）
+const CONN_STROKE = "#9ba5c0";  // 连线颜色
+const CONN_LABEL_TEXT = "#6b7280"; // 连线标签文字
 
 const DIMS: Record<string,[number,number]> = {
   rect:[140,56],"rounded-rect":[140,56],diamond:[130,76],ellipse:[130,64],
@@ -51,28 +105,50 @@ const DIMS: Record<string,[number,number]> = {
   "cloud-aws":[150,88],mobile:[60,100],monitor:[140,80],mindmap:[120,36]
 };
 
+// 所有图形统一使用白底+浅蓝灰描边
 const DEFS: Record<string,{fill:string;stroke:string}> = {
-  rect:{fill:"#e0e7ff",stroke:"#4f46e5"},"rounded-rect":{fill:"#d1fae5",stroke:"#059669"},
-  diamond:{fill:"#fef3c7",stroke:"#d97706"},ellipse:{fill:"#fce7f3",stroke:"#db2777"},
-  parallelogram:{fill:"#ede9fe",stroke:"#7c3aed"},trapezoid:{fill:"#fef3c7",stroke:"#d97706"},
-  pentagon:{fill:"#e0f2fe",stroke:"#0891b2"},triangle:{fill:"#ede9fe",stroke:"#7c3aed"},
-  hexagon:{fill:"#f0fdf4",stroke:"#16a34a"},star:{fill:"#fef3c7",stroke:"#d97706"},
-  cross:{fill:"#fce7f3",stroke:"#db2777"},"arrow-right":{fill:"#dbeafe",stroke:"#2563eb"},
-  callout:{fill:"#fef9c3",stroke:"#ca8a04"},cylinder:{fill:"#dbeafe",stroke:"#2563eb"},
-  document:{fill:"#f3f4f6",stroke:"#6b7280"},cloud:{fill:"#e0f2fe",stroke:"#0891b2"},
-  terminal:{fill:"#d1fae5",stroke:"#059669"},"manual-input":{fill:"#fef3c7",stroke:"#d97706"},
-  "off-page":{fill:"#ede9fe",stroke:"#7c3aed"},preparation:{fill:"#fce7f3",stroke:"#db2777"},
-  delay:{fill:"#e0f2fe",stroke:"#0891b2"},"swimlane-h":{fill:"#f0fdf4",stroke:"#16a34a"},
-  "swimlane-v":{fill:"#fef2f2",stroke:"#dc2626"},"group-box":{fill:"transparent",stroke:"#9ca3af"},
-  "uml-class":{fill:"#faf5ff",stroke:"#7c3aed"},"uml-interface":{fill:"#ecfeff",stroke:"#0891b2"},
-  "uml-note":{fill:"#fef9c3",stroke:"#ca8a04"},actor:{fill:"transparent",stroke:"#475569"},
-  "use-case":{fill:"#fce7f3",stroke:"#db2777"},component:{fill:"#e0e7ff",stroke:"#4f46e5"},
-  lifeline:{fill:"#e0e7ff",stroke:"#4f46e5"},"er-entity":{fill:"#dbeafe",stroke:"#2563eb"},
-  "er-attr":{fill:"#fce7f3",stroke:"#db2777"},"er-relation":{fill:"#fef3c7",stroke:"#d97706"},
-  "er-weak-entity":{fill:"#dbeafe",stroke:"#2563eb"},server:{fill:"#e0e7ff",stroke:"#4f46e5"},
-  database2:{fill:"#dbeafe",stroke:"#2563eb"},router:{fill:"#e0f2fe",stroke:"#0891b2"},
-  firewall:{fill:"#fecaca",stroke:"#dc2626"},"cloud-aws":{fill:"#fef3c7",stroke:"#d97706"},
-  mobile:{fill:"#e0e7ff",stroke:"#4f46e5"},monitor:{fill:"#e0e7ff",stroke:"#4f46e5"}
+  rect:{fill:NODE_FILL,stroke:NODE_STROKE},
+  "rounded-rect":{fill:NODE_FILL,stroke:NODE_STROKE},
+  diamond:{fill:NODE_FILL,stroke:NODE_STROKE},
+  ellipse:{fill:NODE_FILL,stroke:NODE_STROKE},
+  parallelogram:{fill:NODE_FILL,stroke:NODE_STROKE},
+  trapezoid:{fill:NODE_FILL,stroke:NODE_STROKE},
+  pentagon:{fill:NODE_FILL,stroke:NODE_STROKE},
+  triangle:{fill:NODE_FILL,stroke:NODE_STROKE},
+  hexagon:{fill:NODE_FILL,stroke:NODE_STROKE},
+  star:{fill:NODE_FILL,stroke:NODE_STROKE},
+  cross:{fill:NODE_FILL,stroke:NODE_STROKE},
+  "arrow-right":{fill:NODE_FILL,stroke:NODE_STROKE},
+  callout:{fill:NODE_FILL,stroke:NODE_STROKE},
+  cylinder:{fill:NODE_FILL,stroke:NODE_STROKE},
+  document:{fill:NODE_FILL,stroke:NODE_STROKE},
+  cloud:{fill:NODE_FILL,stroke:NODE_STROKE},
+  terminal:{fill:NODE_FILL,stroke:NODE_STROKE},
+  "manual-input":{fill:NODE_FILL,stroke:NODE_STROKE},
+  "off-page":{fill:NODE_FILL,stroke:NODE_STROKE},
+  preparation:{fill:NODE_FILL,stroke:NODE_STROKE},
+  delay:{fill:NODE_FILL,stroke:NODE_STROKE},
+  "swimlane-h":{fill:"#f8f9fc",stroke:NODE_STROKE},
+  "swimlane-v":{fill:"#f8f9fc",stroke:NODE_STROKE},
+  "group-box":{fill:"transparent",stroke:"#c8cfe0"},
+  "uml-class":{fill:NODE_FILL,stroke:NODE_STROKE},
+  "uml-interface":{fill:NODE_FILL,stroke:NODE_STROKE},
+  "uml-note":{fill:"#fffde7",stroke:NODE_STROKE},
+  actor:{fill:"transparent",stroke:NODE_STROKE},
+  "use-case":{fill:NODE_FILL,stroke:NODE_STROKE},
+  component:{fill:NODE_FILL,stroke:NODE_STROKE},
+  lifeline:{fill:NODE_FILL,stroke:NODE_STROKE},
+  "er-entity":{fill:NODE_FILL,stroke:NODE_STROKE},
+  "er-attr":{fill:NODE_FILL,stroke:NODE_STROKE},
+  "er-relation":{fill:NODE_FILL,stroke:NODE_STROKE},
+  "er-weak-entity":{fill:NODE_FILL,stroke:NODE_STROKE},
+  server:{fill:NODE_FILL,stroke:NODE_STROKE},
+  database2:{fill:NODE_FILL,stroke:NODE_STROKE},
+  router:{fill:NODE_FILL,stroke:NODE_STROKE},
+  firewall:{fill:NODE_FILL,stroke:NODE_STROKE},
+  "cloud-aws":{fill:NODE_FILL,stroke:NODE_STROKE},
+  mobile:{fill:NODE_FILL,stroke:NODE_STROKE},
+  monitor:{fill:NODE_FILL,stroke:NODE_STROKE}
 };
 
 const TEXT_DEFS: Record<string,string> = {
@@ -110,13 +186,16 @@ export class DiagramEngine {
   zoom = 1; panX = 0; panY = 0;
   sel = new Set<string>(); selConn: DiagramConn | null = null;
   hover: string | null = null; linking: string | null = null; linkStyle = "orthogonal";
-  theme = "indigo"; snapping = true; gs = 20; showGrid = true;
+  theme = "sky"; snapping = true; gs = 20; showGrid = true;
   undos: any[] = []; redos: any[] = [];
   dragging = false; resizing = false; drawing = false; panning = false;
   ds: any = null; rh: string | null = null;
   editNode: DiagramNode | null = null; curPath: DiagramPath | null = null;
-  spaceDown = false; marqueeMode = "contain"; marqueeBox: any = null;
+  spaceDown = false;
+  marqueeMode = "partial"; marqueeActive = false; marqueeStart: {x:number;y:number} | null = null; marqueeEnd: {x:number;y:number} | null = null;
   fmtBrush: any = null; fmtBrushOn = false;
+  // Free draw
+  freeDrawTool = "pen"; freeDrawColor = "#1e293b"; freeDrawWidth = 2; freeDrawEraser = false; eraserSize = 24;
   canvas: HTMLCanvasElement | null = null; ctx: CanvasRenderingContext2D | null = null;
   onToast?: (msg: string) => void;
   onStateChange?: (state: DiagramState) => void;
@@ -150,12 +229,14 @@ export class DiagramEngine {
 
   mkNode(type: string, x: number, y: number, pid: string | null): DiagramNode {
     const [w, h] = DIMS[type] || [140, 56];
-    const d = DEFS[type] || { fill: "#e0e7ff", stroke: "#4f46e5" };
+    const d = DEFS[type] || { fill: NODE_FILL, stroke: NODE_STROKE };
+    // rounded-rect 圆角更大，接近参考图的圆角矩形
+    const cornerRadius = type === "rounded-rect" || type === "terminal" ? 16 : (type === "mindmap" ? 8 : 2);
     return {
       id: gid(), type, x, y, width: w, height: h, fill: d.fill, stroke: d.stroke,
-      sw: 1.5, ls: "solid", cr: type === "rounded-rect" ? 10 : 0, opacity: 100,
+      sw: 1.5, ls: "solid", cr: cornerRadius, opacity: 100,
       text: TEXT_DEFS[type] || "文本", fs: 13, ff: "PingFang SC",
-      fb: type === "mindmap", fi: false, fu: false, fc: "#1a1a2e", ta: "center",
+      fb: type === "mindmap", fi: false, fu: false, fc: NODE_TEXT, ta: "center",
       parentId: pid || null, collapsed: false, rot: 0, isMM: type === "mindmap",
       isSw: type.startsWith("swimlane")
     };
@@ -211,11 +292,16 @@ export class DiagramEngine {
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
     ctx.save();
 
-    // Grid
+    // 背景填充白色
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+    // Grid — 主题色网格
     if (this.showGrid && this.zoom > 0.25) {
+      const t = MM_THEMES[this.theme] || MM_THEMES.sky;
       const gs = this.gs * this.zoom;
       const sx = ((this.panX % gs) + gs) % gs, sy = ((this.panY % gs) + gs) % gs;
-      ctx.strokeStyle = "#e5e7eb"; ctx.lineWidth = 0.5; ctx.beginPath();
+      ctx.strokeStyle = t.gridColor; ctx.lineWidth = 0.5; ctx.beginPath();
       for (let x = sx; x < this.canvas.width; x += gs) { ctx.moveTo(x, 0); ctx.lineTo(x, this.canvas.height); }
       for (let y = sy; y < this.canvas.height; y += gs) { ctx.moveTo(0, y); ctx.lineTo(this.canvas.width, y); }
       ctx.stroke();
@@ -226,6 +312,9 @@ export class DiagramEngine {
 
     // Draw connections
     this.drawConns();
+
+    // Mindmap parent→child curved connections
+    if (this.mode === "mindmap") this.drawMMConns();
 
     // Draw nodes
     for (const n of this.nodes) {
@@ -238,12 +327,55 @@ export class DiagramEngine {
     if (this.linking && this.mode === "flowchart") {
       const fn = this.gn(this.linking);
       if (fn) {
-        const p = toCv(0, 0, this.canvas!, this.zoom, this.panX, this.panY);
-        ctx.strokeStyle = "#4f46e5"; ctx.lineWidth = 1.5; ctx.setLineDash([6, 4]); ctx.beginPath();
+        ctx.strokeStyle = "#6366f1"; ctx.lineWidth = 1.5; ctx.setLineDash([6, 4]); ctx.beginPath();
         ctx.moveTo(fn.x + fn.width / 2, fn.y);
-        ctx.lineTo(p.x, p.y); ctx.stroke(); ctx.setLineDash([]);
+        ctx.stroke(); ctx.setLineDash([]);
       }
     }
+
+    // Draw free draw paths
+    for (const path of this.paths) this.drawPath(path);
+    // Draw in-progress path
+    if (this.drawing && this.curPath) this.drawPath(this.curPath);
+
+    // Marquee selection box
+    if (this.marqueeActive && this.marqueeStart && this.marqueeEnd) {
+      const x = Math.min(this.marqueeStart.x, this.marqueeEnd.x);
+      const y = Math.min(this.marqueeStart.y, this.marqueeEnd.y);
+      const w = Math.abs(this.marqueeEnd.x - this.marqueeStart.x);
+      const h = Math.abs(this.marqueeEnd.y - this.marqueeStart.y);
+      ctx.setLineDash([]);
+      ctx.strokeStyle = "#3b82f6"; ctx.lineWidth = 1;
+      ctx.fillStyle = "rgba(59,130,246,0.08)";
+      ctx.beginPath(); ctx.rect(x, y, w, h); ctx.fill(); ctx.stroke();
+    }
+
+    // Eraser cursor preview
+    if (this.mode === "freedraw" && this.freeDrawEraser) {
+      ctx.setLineDash([]);
+      ctx.strokeStyle = "#ef4444"; ctx.lineWidth = 1;
+      ctx.fillStyle = "rgba(239,68,68,0.1)";
+      // Position will be updated from page via move handler; show near last mouse position or center
+    }
+
+    ctx.restore();
+  }
+
+  drawPath(path: DiagramPath) {
+    const ctx = this.ctx!;
+    if (!path.pts || path.pts.length < 2) return;
+    ctx.save();
+    ctx.strokeStyle = path.color;
+    ctx.lineWidth = path.width;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    ctx.moveTo(path.pts[0].x, path.pts[0].y);
+    for (let i = 1; i < path.pts.length; i++) {
+      ctx.lineTo(path.pts[i].x, path.pts[i].y);
+    }
+    ctx.stroke();
     ctx.restore();
   }
 
@@ -254,36 +386,53 @@ export class DiagramEngine {
       if (!f || !t) continue;
       const fp = this.clCPt(f, t.x + t.width / 2, t.y + t.height / 2);
       const tp = this.clCPt(t, fp.x, fp.y);
-      ctx.strokeStyle = c.stroke || "#6b7280"; ctx.lineWidth = c.sw || 1.5;
+
+      const strokeColor = c.stroke || CONN_STROKE;
+      ctx.strokeStyle = strokeColor;
+      ctx.lineWidth = c.sw || 1.5;
+
+      // 虚线样式
+      if (c.ls === "dashed") {
+        ctx.setLineDash([8, 5]);
+      } else {
+        ctx.setLineDash([]);
+      }
+
       ctx.beginPath();
       if (c.style === "curved") {
-        const cpx = (fp.x + tp.x) / 2, cpy = Math.min(fp.y, tp.y) - 40;
-        ctx.moveTo(fp.x, fp.y); ctx.quadraticCurveTo(cpx, cpy, tp.x, tp.y);
+        // 曲线：贝塞尔曲线，弧度自然
+        const dx = tp.x - fp.x, dy = tp.y - fp.y;
+        const cpx1 = fp.x + dx * 0.25, cpy1 = fp.y;
+        const cpx2 = tp.x - dx * 0.25, cpy2 = tp.y;
+        ctx.moveTo(fp.x, fp.y);
+        ctx.bezierCurveTo(cpx1, cpy1, cpx2, cpy2, tp.x, tp.y);
       } else {
+        // 折线：直角转弯
         const mx = (fp.x + tp.x) / 2;
         ctx.moveTo(fp.x, fp.y); ctx.lineTo(mx, fp.y); ctx.lineTo(mx, tp.y); ctx.lineTo(tp.x, tp.y);
       }
       ctx.stroke();
+      ctx.setLineDash([]);
 
-      // Arrow
+      // Arrow — 参考图：实心小三角，颜色同连线
       if (c.style !== "no-arrow") {
-        ctx.fillStyle = c.stroke || "#6b7280"; ctx.beginPath();
+        ctx.fillStyle = strokeColor;
+        ctx.beginPath();
+        // 计算箭头方向（基于最后一段）
         const a = Math.atan2(tp.y - fp.y, tp.x - fp.x);
-        const sz = 9;
+        const sz = 8;
         ctx.moveTo(tp.x, tp.y);
-        ctx.lineTo(tp.x - sz * Math.cos(a - Math.PI / 6), tp.y - sz * Math.sin(a - Math.PI / 6));
-        ctx.lineTo(tp.x - sz * Math.cos(a + Math.PI / 6), tp.y - sz * Math.sin(a + Math.PI / 6));
+        ctx.lineTo(tp.x - sz * Math.cos(a - Math.PI / 7), tp.y - sz * Math.sin(a - Math.PI / 7));
+        ctx.lineTo(tp.x - sz * Math.cos(a + Math.PI / 7), tp.y - sz * Math.sin(a + Math.PI / 7));
         ctx.closePath(); ctx.fill();
       }
 
-      // Label
+      // Label — 参考图样式：无边框、深灰文字、小字
       if (c.label) {
-        const mx = (fp.x + tp.x) / 2, my = (fp.y + tp.y) / 2;
-        ctx.font = '12px "PingFang SC",sans-serif';
-        const tw = ctx.measureText(c.label).width + 8;
-        ctx.fillStyle = "rgba(255,255,255,.9)";
-        ctx.fillRect(mx - tw / 2, my - 9, tw, 18);
-        ctx.fillStyle = "#374151"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        const mx = (fp.x + tp.x) / 2, my = (fp.y + tp.y) / 2 - 10;
+        ctx.font = '11px "PingFang SC",sans-serif';
+        ctx.fillStyle = CONN_LABEL_TEXT;
+        ctx.textAlign = "center"; ctx.textBaseline = "middle";
         ctx.fillText(c.label, mx, my);
       }
     }
@@ -293,11 +442,19 @@ export class DiagramEngine {
     const ctx = this.ctx!;
     ctx.save();
     const sel = this.sel.has(n.id);
-    const sc = sel ? "#4f46e5" : (n.stroke || "#6b7280");
-    const slw = sel ? 2.5 : (n.sw || 1.5);
+
+    // 选中时蓝紫色描边+加粗；非选中时使用节点描边色
+    const sc = sel ? "#5b6cf2" : (n.stroke || NODE_STROKE);
+    const slw = sel ? 2 : (n.sw || 1.5);
     const fill = n.fill && n.fill !== "transparent" ? n.fill : null;
     const x = n.x, y = n.y, w = n.width, h = n.height;
     const cx = x + w / 2, cy = y + h / 2;
+
+    // 选中时给图形加一个淡蓝色光晕
+    if (sel) {
+      ctx.shadowColor = "rgba(99,102,241,0.25)";
+      ctx.shadowBlur = 8;
+    }
 
     if (fill) ctx.fillStyle = fill;
     ctx.strokeStyle = sc; ctx.lineWidth = slw;
@@ -343,27 +500,31 @@ export class DiagramEngine {
         if (fill) ctx.fill(); ctx.stroke(); break;
       }
       default: {
-        const rx = n.cr != null ? n.cr : (n.type === "rounded-rect" || n.type === "mindmap" ? 8 : 2);
+        // 矩形：直角；rounded-rect：大圆角（接近参考图）；mindmap：小圆角
+        const rx = n.cr != null ? n.cr : (n.type === "rounded-rect" ? 16 : n.type === "mindmap" ? 8 : 2);
         ctx.beginPath(); rrP(ctx, x, y, w, h, rx);
         if (fill) ctx.fill(); ctx.stroke();
       }
     }
 
-    // Text
+    // 清除光晕
+    ctx.shadowColor = "transparent"; ctx.shadowBlur = 0;
+
+    // Text — 参考图：深色文字，字体适中，清晰可读
     const noTxt = ["actor", "server", "router", "monitor", "mobile", "swimlane-h", "swimlane-v", "group-box", "uml-class", "uml-interface", "lifeline", "component"];
     if (!noTxt.includes(n.type)) {
       const fsa: string[] = [];
       if (n.fb) fsa.push("bold");
       if (n.fi) fsa.push("italic");
       ctx.font = fsa.join(" ") + " " + (n.fs || 13) + 'px "' + (n.ff || "PingFang SC") + '",sans-serif';
-      ctx.fillStyle = n.fc || "#1a1a2e";
+      ctx.fillStyle = n.fc || NODE_TEXT;
       ctx.textAlign = n.ta === "left" ? "left" : n.ta === "right" ? "right" : "center";
       ctx.textBaseline = "middle";
       const txX = n.ta === "left" ? x + 8 : n.ta === "right" ? x + w - 8 : cx;
       const txt = n.text || "";
       // Simple text wrapping
       const lines: string[] = []; let curl = "";
-      const mw = w - 12;
+      const mw = w - 16;
       for (const ch of txt) {
         if (ch === "\n") { lines.push(curl); curl = ""; }
         else if (ctx.measureText(curl + ch).width > mw && curl.length > 0) { lines.push(curl); curl = ch; }
@@ -371,14 +532,15 @@ export class DiagramEngine {
       }
       if (curl) lines.push(curl);
       if (!lines.length) lines.push("");
-      const lh = (n.fs || 13) * 1.5;
+      const lh = (n.fs || 13) * 1.6;
       let ty = cy - (lines.length * lh) / 2 + lh / 2;
       for (const l of lines) { ctx.fillText(l, txX, ty); ty += lh; }
     }
 
-    // Selection handles
+    // Selection handles — 白底蓝边的小方块
     if (sel && !this.dragging) {
-      ctx.fillStyle = "#fff"; ctx.strokeStyle = "#4f46e5"; ctx.lineWidth = 1.5;
+      ctx.shadowColor = "transparent"; ctx.shadowBlur = 0;
+      ctx.fillStyle = "#fff"; ctx.strokeStyle = "#5b6cf2"; ctx.lineWidth = 1.5;
       const hs = [
         { x, y }, { x: x + w, y }, { x, y: y + h }, { x: x + w, y: y + h },
         { x: cx, y }, { x: cx, y: y + h }, { x, y: cy }, { x: x + w, y: cy }
@@ -415,16 +577,16 @@ export class DiagramEngine {
     }
   }
   mkMMRoot(x: number, y: number) {
-    const t = THEMES[this.theme];
     const r = this.mkNode("mindmap", x || 200, y || 120, null);
-    r.text = "中心主题"; r.fill = t.fill; r.stroke = t.stroke; r.fc = t.text; r.fs = 15;
+    r.text = "中心主题";
     this.nodes.push(r);
     const labels = ["分支 1", "分支 2", "分支 3"];
     for (let i = 0; i < 3; i++) {
       const c = this.mkNode("mindmap", 0, 0, r.id);
-      c.text = labels[i]; c.fill = t.cc[i]; c.stroke = t.stroke; c.fc = t.text;
+      c.text = labels[i];
       this.nodes.push(c);
     }
+    this.applyMMTheme();
     return r;
   }
   initMM() { this.mkMMRoot(200, 120); this.layoutMM(); }
@@ -432,33 +594,83 @@ export class DiagramEngine {
   addMMChild(pid: string) {
     const p = this.gn(pid);
     if (!p) return;
-    const t = THEMES[this.theme];
     const c = this.mkNode("mindmap", 0, 0, pid);
     c.text = "子节点";
-    const sibs = this.gc(pid);
-    c.fill = t.cc[sibs.length % t.cc.length]; c.stroke = t.stroke; c.fc = t.text;
     this.nodes.push(c); this.layoutMM();
+    this.applyMMTheme();
     this.selN(c.id); this.render();
   }
   selN(id: string) { this.sel.clear(); this.sel.add(id); this.selConn = null; }
 
+  // Mindmap depth: root=0, child=1, grandchild=2, ...
+  getMMDepth(nid: string): number {
+    let d = 0; let n = this.gn(nid);
+    while (n?.parentId) { d++; n = this.gn(n.parentId); }
+    return d;
+  }
+
+  // Draw curved connections between mindmap parent→child
+  drawMMConns() {
+    const ctx = this.ctx!;
+    const t = MM_THEMES[this.theme] || MM_THEMES.sky;
+    for (const n of this.nodes) {
+      if (!n.isMM || !n.parentId) continue;
+      const p = this.gn(n.parentId);
+      if (!p || p.collapsed) continue;
+
+      const sx = p.x + p.width + 1;
+      const sy = p.y + p.height / 2;
+      const ex = n.x - 1;
+      const ey = n.y + n.height / 2;
+      const mx = (sx + ex) / 2;
+
+      const depth = this.getMMDepth(n.id);
+      const lvl = Math.min(depth, t.strokes.length - 1);
+      const connColor = depth === 0 ? t.strokes[0] : t.connStroke;
+
+      ctx.strokeStyle = connColor;
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.moveTo(sx, sy);
+      ctx.bezierCurveTo(mx, sy, mx, ey, ex, ey);
+      ctx.stroke();
+    }
+  }
+
+  // Apply theme colors to all mindmap nodes by depth
+  applyMMTheme() {
+    const t = MM_THEMES[this.theme] || MM_THEMES.sky;
+    for (const n of this.nodes) {
+      if (!n.isMM) continue;
+      const depth = Math.min(this.getMMDepth(n.id), t.fills.length - 1);
+      n.fill = t.fills[depth];
+      n.stroke = t.strokes[depth];
+      n.fc = t.texts[depth];
+      n.fs = depth === 0 ? 15 : 13;
+      n.fb = depth === 0;
+      n.cr = 8;
+    }
+  }
+
   // Flow node
   crFlowNode(type: string, x: number, y: number): DiagramNode {
-    const d = DEFS[type] || { fill: "#e0e7ff", stroke: "#4f46e5" };
+    const d = DEFS[type] || { fill: NODE_FILL, stroke: NODE_STROKE };
     const [w, h] = DIMS[type] || [140, 56];
+    const cr = type === "rounded-rect" || type === "terminal" ? 16 : (type === "mindmap" ? 8 : 2);
     return {
       id: gid(), type, x: x - w / 2, y: y - h / 2, width: w, height: h,
       fill: d.fill, stroke: d.stroke, sw: 1.5, ls: "solid",
-      cr: type === "rounded-rect" ? 10 : 0, opacity: 100,
+      cr, opacity: 100,
       text: TEXT_DEFS[type] || "文本", fs: 13, ff: "PingFang SC",
-      fb: false, fi: false, fu: false, fc: "#1a1a2e", ta: "center",
+      fb: false, fi: false, fu: false, fc: NODE_TEXT, ta: "center",
       parentId: null, collapsed: false, rot: 0, isMM: false,
       isSw: type.startsWith("swimlane")
     };
   }
   mkConn(fromId: string, toId: string, style: string): DiagramConn {
     return {
-      id: gid(), fromId, toId, style, stroke: "#6b7280", sw: 1.5,
+      id: gid(), fromId, toId, style, stroke: CONN_STROKE, sw: 1.5,
       ls: style === "implements" || style === "dashed" ? "dashed" : "solid",
       arrowEnd: !(style === "no-arrow"), label: ""
     };
@@ -476,11 +688,11 @@ export class DiagramEngine {
     oc.save(); oc.translate(-minX + pad, -minY + pad);
     for (const n of this.nodes) {
       if (n.fill && n.fill !== "transparent") oc.fillStyle = n.fill;
-      const rx = n.cr != null ? n.cr : 2;
+      const rx = n.cr != null ? n.cr : (n.type === "rounded-rect" ? 16 : 2);
       oc.beginPath(); rrP(oc, n.x, n.y, n.width, n.height, rx); oc.fill();
-      oc.strokeStyle = n.stroke; oc.lineWidth = n.sw; oc.stroke();
+      oc.strokeStyle = n.stroke || NODE_STROKE; oc.lineWidth = n.sw || 1.5; oc.stroke();
       oc.font = (n.fb ? "bold " : "") + (n.fi ? "italic " : "") + (n.fs || 13) + 'px "' + (n.ff || "PingFang SC") + '",sans-serif';
-      oc.fillStyle = n.fc || "#1a1a2e"; oc.textAlign = "center"; oc.textBaseline = "middle";
+      oc.fillStyle = n.fc || NODE_TEXT; oc.textAlign = "center"; oc.textBaseline = "middle";
       oc.fillText(n.text || "", n.x + n.width / 2, n.y + n.height / 2);
     }
     oc.restore();
@@ -497,6 +709,102 @@ export class DiagramEngine {
     a.download = "diagram-" + new Date().toISOString().slice(0, 10) + ".json";
     a.click(); this.onToast?.("JSON 已导出");
   }
+
+  // ======================== FREE DRAW ========================
+  startFreeDraw(px: number, py: number) {
+    this.pu();
+    this.drawing = true;
+    this.curPath = {
+      id: gid(), tool: this.freeDrawTool, color: this.freeDrawColor, width: this.freeDrawWidth,
+      pts: [{ x: px, y: py }]
+    };
+  }
+  continueFreeDraw(px: number, py: number) {
+    if (!this.drawing || !this.curPath) return;
+    this.curPath.pts.push({ x: px, y: py });
+    this.render();
+  }
+  endFreeDraw() {
+    if (!this.drawing || !this.curPath) return;
+    // Don't save single-point paths
+    if (this.curPath.pts.length < 2) { this.drawing = false; this.curPath = null; this.render(); return; }
+    this.paths.push(this.curPath);
+    this.drawing = false; this.curPath = null;
+    this.render();
+  }
+
+  // ======================== ERASER ========================
+  eraseAtPoint(px: number, py: number) {
+    const r = this.eraserSize;
+    // Check paths
+    this.paths = this.paths.filter(path => {
+      for (const pt of path.pts) {
+        const dx = pt.x - px, dy = pt.y - py;
+        if (dx * dx + dy * dy < r * r) return false;
+      }
+      return true;
+    });
+    // Also check current path
+    if (this.curPath) {
+      let keep = true;
+      for (const pt of this.curPath.pts) {
+        const dx = pt.x - px, dy = pt.y - py;
+        if (dx * dx + dy * dy < r * r) { keep = false; break; }
+      }
+      if (!keep) { this.curPath = null; this.drawing = false; }
+    }
+  }
+
+  // ======================== MARQUEE SELECTION ========================
+  startMarquee(px: number, py: number) {
+    this.marqueeActive = true;
+    this.marqueeStart = { x: px, y: py };
+    this.marqueeEnd = { x: px, y: py };
+    this.render();
+  }
+  updateMarquee(px: number, py: number) {
+    if (!this.marqueeActive) return;
+    this.marqueeEnd = { x: px, y: py };
+    this.render();
+  }
+  endMarquee(additive: boolean) {
+    if (!this.marqueeActive || !this.marqueeStart || !this.marqueeEnd) return;
+    const x1 = Math.min(this.marqueeStart.x, this.marqueeEnd.x);
+    const y1 = Math.min(this.marqueeStart.y, this.marqueeEnd.y);
+    const x2 = Math.max(this.marqueeStart.x, this.marqueeEnd.x);
+    const y2 = Math.max(this.marqueeStart.y, this.marqueeEnd.y);
+    const boxW = x2 - x1, boxH = y2 - y1;
+    // Tiny box = single click on empty space, clear selection
+    if (boxW < 4 && boxH < 4) {
+      if (!additive) { this.sel.clear(); this.selConn = null; }
+      this.marqueeActive = false; this.marqueeStart = null; this.marqueeEnd = null;
+      this.render();
+      return;
+    }
+    if (!additive) { this.sel.clear(); this.selConn = null; }
+    for (const n of this.nodes) {
+      if (n.isMM && this.mode !== "mindmap") continue;
+      if (!n.isMM && this.mode === "mindmap") continue;
+      if (this.marqueeMode === "contain") {
+        // Must fully contain
+        if (n.x >= x1 && n.y >= y1 && n.x + n.width <= x2 && n.y + n.height <= y2) {
+          this.sel.add(n.id);
+        }
+      } else {
+        // Partial overlap
+        if (n.x < x2 && n.x + n.width > x1 && n.y < y2 && n.y + n.height > y1) {
+          this.sel.add(n.id);
+        }
+      }
+    }
+    this.marqueeActive = false; this.marqueeStart = null; this.marqueeEnd = null;
+    this.render();
+  }
+
+  // Space down handling
+  setSpaceDown(down: boolean) {
+    this.spaceDown = down;
+  }
 }
 
-export { PALETTE, THEMES, DIMS, DEFS };
+export { PALETTE, MM_THEMES, DIMS, DEFS };
