@@ -29,6 +29,10 @@ export default function DashboardPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [contextMenu, setContextMenu] = useState<{x: number; y: number; type: "folder"|"project"; id: string} | null>(null);
+  const [showRenameModal, setShowRenameModal] = useState(false);
+  const [renameTarget, setRenameTarget] = useState<{type: "folder"|"project"; id: string; currentName: string; currentFolderId: string | null} | null>(null);
+  const [renameFormName, setRenameFormName] = useState("");
+  const [renameFormFolder, setRenameFormFolder] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -96,22 +100,36 @@ export default function DashboardPage() {
   };
 
   const renameItem = async (type: "folder"|"project", id: string) => {
-    const name = prompt("新名称：");
-    if (!name) return;
-    if (type === "folder") {
-      await apiCall(`/api/folders/${id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name }),
-      });
-    } else {
-      await apiCall(`/api/projects/${id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name }),
-      });
-    }
+    const item = type === "project"
+      ? projects.find(p => p.id === id)
+      : folders.find(f => f.id === id);
+    if (!item) return;
     setContextMenu(null);
+    setRenameTarget({
+      type,
+      id,
+      currentName: item.name,
+      currentFolderId: type === "project" ? (item as Project).folder_id : null,
+    });
+    setRenameFormName(item.name);
+    setRenameFormFolder(type === "project" ? (item as Project).folder_id : null);
+    setShowRenameModal(true);
+  };
+
+  const handleRenameConfirm = async () => {
+    const t = renameTarget;
+    if (!t || !renameFormName.trim()) return;
+    const body: any = { name: renameFormName.trim() };
+    if (t.type === "project") {
+      body.folder_id = renameFormFolder;
+    }
+    await apiCall(`/api/${t.type === "folder" ? "folders" : "projects"}/${t.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    setShowRenameModal(false);
+    setRenameTarget(null);
     fetchData();
   };
 
@@ -346,6 +364,92 @@ export default function DashboardPage() {
             </button>
           </div>
         </>
+      )}
+
+      {/* Rename Modal */}
+      {showRenameModal && renameTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          {/* Backdrop */}
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => { setShowRenameModal(false); setRenameTarget(null); }} />
+          {/* Dialog */}
+          <div className="relative bg-white rounded-2xl shadow-2xl border border-gray-200 w-[400px] max-w-[90vw] overflow-hidden animate-in zoom-in-95 duration-150">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+              <h2 className="text-base font-semibold text-gray-900">
+                {renameTarget.type === "project" ? "重命名项目" : "重命名文件夹"}
+              </h2>
+              <button
+                onClick={() => { setShowRenameModal(false); setRenameTarget(null); }}
+                className="h-7 w-7 flex items-center justify-center rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+              >
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+                  <path d="M1 1L13 13M13 1L1 13"/>
+                </svg>
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="px-6 py-5 space-y-4">
+              {/* Name field */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  {renameTarget.type === "project" ? "项目名称" : "文件夹名称"}
+                  <span className="text-red-400 ml-0.5">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={renameFormName}
+                  onChange={(e) => setRenameFormName(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter" && renameFormName.trim()) handleRenameConfirm(); }}
+                  placeholder={renameTarget.type === "project" ? "输入项目名称" : "输入文件夹名称"}
+                  className="w-full h-10 px-3.5 rounded-lg border border-gray-300 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition-all"
+                  autoFocus
+                />
+              </div>
+
+              {/* Folder selector — only for projects */}
+              {renameTarget.type === "project" && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    文件夹
+                    <span className="text-gray-400 font-normal ml-1">（可选）</span>
+                  </label>
+                  <select
+                    value={renameFormFolder || ""}
+                    onChange={(e) => setRenameFormFolder(e.target.value || null)}
+                    className="w-full h-10 px-3.5 rounded-lg border border-gray-300 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition-all appearance-none cursor-pointer"
+                    style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 12px center", paddingRight: "36px" }}
+                  >
+                    <option value="">— 根目录 —</option>
+                    {folders
+                      .filter(f => f.id !== renameTarget.id)
+                      .map(f => (
+                        <option key={f.id} value={f.id}>{f.name}</option>
+                      ))
+                    }
+                  </select>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100 bg-gray-50/50">
+              <button
+                onClick={() => { setShowRenameModal(false); setRenameTarget(null); }}
+                className="h-9 px-4 rounded-lg text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-200/60 transition-colors"
+              >
+                取消
+              </button>
+              <button
+                onClick={handleRenameConfirm}
+                disabled={!renameFormName.trim()}
+                className="h-9 px-5 rounded-lg text-sm font-medium text-white bg-indigo-500 hover:bg-indigo-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-sm"
+              >
+                确认
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
