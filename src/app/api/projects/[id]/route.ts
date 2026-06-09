@@ -26,12 +26,13 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 
   const db = createServerDb();
   const body = await request.json();
-  const { name, diagram_data, mode } = body;
+  const { name, diagram_data, mode, folder_id } = body;
 
   const update: Record<string, unknown> = {};
   if (name !== undefined) update.name = name;
   if (diagram_data !== undefined) update.diagram_data = diagram_data;
   if (mode !== undefined) update.mode = mode;
+  if (folder_id !== undefined) update.folder_id = folder_id;
 
   const { data, error } = await db
     .from("projects")

@@ -64,20 +64,38 @@ export default function DashboardPage() {
 
   const createFolder = async () => {
     if (!newFolderName.trim()) return;
-    await apiCall("/api/folders", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: newFolderName.trim(), parent_id: selectedFolder }),
-    });
+    const name = newFolderName.trim();
+    // Optimistic: add to local state immediately
+    const tempId = "temp_" + Date.now();
+    const newFolder: any = { id: tempId, name, parent_id: selectedFolder || null };
+    setFolders(prev => [...prev, newFolder]);
     setNewFolderName(""); setShowNewFolder(false);
-    fetchData();
+    try {
+      const data = await apiCall("/api/folders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, parent_id: selectedFolder }),
+      });
+      // Replace temp with real
+      setFolders(prev => prev.map(f => f.id === tempId ? data : f));
+    } catch {
+      // Rollback
+      setFolders(prev => prev.filter(f => f.id !== tempId));
+    }
   };
 
   const deleteFolder = async (id: string) => {
-    await apiCall(`/api/folders/${id}`, { method: "DELETE" }).catch(() => {});
-    if (selectedFolder === id) setSelectedFolder(null);
     setContextMenu(null);
-    fetchData();
+    // Optimistic: remove from local state immediately
+    const prevFolders = folders;
+    setFolders(prev => prev.filter(f => f.id !== id));
+    if (selectedFolder === id) setSelectedFolder(null);
+    try {
+      await apiCall(`/api/folders/${id}`, { method: "DELETE" });
+    } catch {
+      // Rollback
+      setFolders(prevFolders);
+    }
   };
 
   const createProject = async (mode: string = "flowchart") => {
@@ -94,9 +112,16 @@ export default function DashboardPage() {
   };
 
   const deleteProject = async (id: string) => {
-    await apiCall(`/api/projects/${id}`, { method: "DELETE" });
     setContextMenu(null);
-    fetchData();
+    // Optimistic: remove from local state immediately
+    const prevProjects = projects;
+    setProjects(prev => prev.filter(p => p.id !== id));
+    try {
+      await apiCall(`/api/projects/${id}`, { method: "DELETE" });
+    } catch {
+      // Rollback
+      setProjects(prevProjects);
+    }
   };
 
   const renameItem = async (type: "folder"|"project", id: string) => {
@@ -119,18 +144,36 @@ export default function DashboardPage() {
   const handleRenameConfirm = async () => {
     const t = renameTarget;
     if (!t || !renameFormName.trim()) return;
-    const body: any = { name: renameFormName.trim() };
+    const newName = renameFormName.trim();
+    const newFolderId = t.type === "project" ? renameFormFolder : undefined;
+
+    // Optimistic: update local state immediately
     if (t.type === "project") {
-      body.folder_id = renameFormFolder;
+      setProjects(prev => prev.map(p => p.id === t.id ? { ...p, name: newName, folder_id: newFolderId ?? p.folder_id } : p));
+    } else {
+      setFolders(prev => prev.map(f => f.id === t.id ? { ...f, name: newName } : f));
     }
-    await apiCall(`/api/${t.type === "folder" ? "folders" : "projects"}/${t.id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
     setShowRenameModal(false);
     setRenameTarget(null);
-    fetchData();
+
+    const body: any = { name: newName };
+    if (t.type === "project") body.folder_id = newFolderId;
+    try {
+      const data = await apiCall(`/api/${t.type === "folder" ? "folders" : "projects"}/${t.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      // Apply server response to ensure consistency
+      if (t.type === "project") {
+        setProjects(prev => prev.map(p => p.id === t.id ? { ...p, name: data.name, folder_id: data.folder_id } : p));
+      } else {
+        setFolders(prev => prev.map(f => f.id === t.id ? { ...f, name: data.name } : f));
+      }
+    } catch {
+      // Rollback: re-fetch to restore correct state
+      fetchData();
+    }
   };
 
   const filteredFolders = folders.filter(f => {
