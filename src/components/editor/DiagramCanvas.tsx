@@ -200,6 +200,7 @@ export class DiagramEngine {
   rectStart: {x:number;y:number} | null = null; rectPreview: {x:number;y:number;w:number;h:number} | null = null;
   lineStart: {x:number;y:number} | null = null; linePreview: {sx:number;sy:number;ex:number;ey:number} | null = null;
   canvas: HTMLCanvasElement | null = null; ctx: CanvasRenderingContext2D | null = null;
+  wrapEl: HTMLElement | null = null; // 用于坐标统一转换，与页面 mouse handler 保持一致
   onToast?: (msg: string) => void;
   onStateChange?: (state: DiagramState) => void;
 
@@ -248,7 +249,9 @@ export class DiagramEngine {
 
   // Hit testing
   hitN(mx: number, my: number): DiagramNode | null {
-    const p = toCv(mx, my, this.canvas!, this.zoom, this.panX, this.panY);
+    // 使用 wrapEl（与页面 mouse handler 一致）而非 canvas（有 border 偏移）
+    const el = this.wrapEl || this.canvas!;
+    const p = toCv(mx, my, el, this.zoom, this.panX, this.panY);
     for (let i = this.nodes.length - 1; i >= 0; i--) {
       const n = this.nodes[i];
       if (this.mode === "freedraw" && !n.isFD) continue;

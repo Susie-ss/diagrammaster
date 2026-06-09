@@ -166,6 +166,7 @@ export default function EditorPage() {
       eng.canvas = canvas;
       eng.ctx = canvas.getContext("2d")!;
       eng.onToast = toast;
+      eng.wrapEl = wrap;  // 统一坐标系：hitN 使用 wrap rect，与页面 mouse handler 一致
       engineRef.current = eng;
 
       // Trigger re-render so toolbar picks up engine ref
