@@ -184,6 +184,8 @@ export class DiagramEngine {
   paths: DiagramPath[] = [];
   mode = "flowchart";
   zoom = 1; panX = 0; panY = 0;
+  // 每种模式独立保存平移/缩放状态，切换模式时互不影响
+  modeStates: Record<string, { panX: number; panY: number; zoom: number }> = {};
   sel = new Set<string>(); selConn: DiagramConn | null = null;
   hover: string | null = null; linking: string | null = null; linkStyle = "orthogonal";
   theme = "sky"; snapping = true; gs = 20; showGrid = true;

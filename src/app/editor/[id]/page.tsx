@@ -266,6 +266,15 @@ export default function EditorPage() {
   const switchMode = useCallback((m: string) => {
     const eng = engineRef.current;
     if (!eng) return;
+    // 保存当前模式的平移/缩放状态
+    eng.modeStates[eng.mode] = { panX: eng.panX, panY: eng.panY, zoom: eng.zoom };
+    // 恢复目标模式的平移/缩放状态
+    const saved = eng.modeStates[m];
+    if (saved) {
+      eng.panX = saved.panX; eng.panY = saved.panY; eng.zoom = saved.zoom;
+    } else {
+      eng.panX = 0; eng.panY = 0; eng.zoom = 1;
+    }
     eng.mode = m; eng.sel.clear(); eng.selConn = null; eng.linking = null;
     if (m === "mindmap") {
       if (!eng.nodes.filter(n => n.isMM).length) eng.initMM();
