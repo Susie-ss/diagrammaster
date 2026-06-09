@@ -156,8 +156,11 @@ export default function EditorPage() {
       setProject(proj);
       document.title = proj.name + " - DiagramMaster";
 
-      canvas.width = wrap.clientWidth;
-      canvas.height = wrap.clientHeight;
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = wrap.clientWidth * dpr;
+      canvas.height = wrap.clientHeight * dpr;
+      canvas.style.width = wrap.clientWidth + "px";
+      canvas.style.height = wrap.clientHeight + "px";
 
       const eng = new DiagramEngine();
       eng.canvas = canvas;
@@ -245,8 +248,11 @@ export default function EditorPage() {
       for (const entry of entries) {
         const { width, height } = entry.contentRect;
         if (canvasRef.current && width > 0 && height > 0) {
-          canvasRef.current.width = width;
-          canvasRef.current.height = height;
+          const dpr = window.devicePixelRatio || 1;
+          canvasRef.current.width = width * dpr;
+          canvasRef.current.height = height * dpr;
+          canvasRef.current.style.width = width + "px";
+          canvasRef.current.style.height = height + "px";
           engineRef.current?.render();
         }
       }
@@ -272,8 +278,8 @@ export default function EditorPage() {
   // Toolbar handlers
   const handleUndo = () => { engineRef.current?.undo(); refP(engineRef.current!); };
   const handleRedo = () => { engineRef.current?.redo(); refP(engineRef.current!); };
-  const handleZoomIn = () => { const e = engineRef.current; if (e) { e.zoom = Math.min(3, e.zoom * 1.15); e.render(); } };
-  const handleZoomOut = () => { const e = engineRef.current; if (e) { e.zoom = Math.max(0.1, e.zoom / 1.15); e.render(); } };
+  const handleZoomIn = () => { const e = engineRef.current; if (e) { e.zoom = Math.min(3, e.zoom * 1.15); e.render(); setEngineVersion(v => v + 1); } };
+  const handleZoomOut = () => { const e = engineRef.current; if (e) { e.zoom = Math.max(0.1, e.zoom / 1.15); e.render(); setEngineVersion(v => v + 1); } };
   const handleFit = () => {
     const e = engineRef.current; if (!e || !wrapRef.current) return;
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -557,7 +563,7 @@ export default function EditorPage() {
     const mx = ev.clientX - r.left, my = ev.clientY - r.top;
     e.panX = mx - (mx - e.panX) * (nz / e.zoom);
     e.panY = my - (my - e.panY) * (nz / e.zoom);
-    e.zoom = nz; e.render();
+    e.zoom = nz; e.render(); setEngineVersion(v => v + 1);
   }, []);
 
   const handleDblClick = useCallback((ev: React.MouseEvent) => {
@@ -627,6 +633,19 @@ export default function EditorPage() {
         e.linking = null; e.render();
         if (ieRef.current) ieRef.current.style.display = "none";
       }
+      // Mindmap Tab/Enter shortcuts
+      if (e && e.mode === "mindmap" && (ev.key === "Tab" || ev.key === "Enter")) {
+        ev.preventDefault();
+        if (ev.key === "Tab" && e.sel.size) {
+          e.pu(); e.addMMChild([...e.sel][0]);
+        } else if (ev.key === "Enter" && e.sel.size) {
+          const n = e.gn([...e.sel][0]);
+          if (n?.parentId) {
+            e.pu(); const s = e.mkNode("mindmap", 0, 0, n.parentId);
+            s.text = "同级节点"; e.nodes.push(s); e.layoutMM(); e.applyMMTheme(); e.selN(s.id); e.render();
+          } else { e.pu(); e.mkMMRoot(200, e.nodes.filter(n2 => n2.isMM && !n2.parentId).length * 300 + 120); e.layoutMM(); e.render(); }
+        }
+      }
       // Space: enter pan mode (prevent page scroll)
       if (ev.key === " " && !ev.repeat) {
         if (tag !== "INPUT" && tag !== "SELECT" && tag !== "TEXTAREA") {
@@ -685,7 +704,7 @@ export default function EditorPage() {
       { label: "放大", action: handleZoomIn, kd: "Ctrl+=" },
       { label: "缩小", action: handleZoomOut, kd: "Ctrl+-" },
       { label: "适应画布", action: handleFit },
-      { label: "100%", action: () => { const e = engineRef.current; if (e) { e.zoom = 1; e.panX = 0; e.panY = 0; e.render(); } } },
+      { label: "100%", action: () => { const e = engineRef.current; if (e) { e.zoom = 1; e.panX = 0; e.panY = 0; e.render(); setEngineVersion(v => v + 1); } } },
     ],
     帮助: [
       { label: "快捷键", action: () => toast("Ctrl+S 保存 · Ctrl+Z 撤销 · Ctrl+Y 重做 · Del 删除 · 滚轮缩放") },
@@ -705,7 +724,7 @@ export default function EditorPage() {
   const shapeNames: Record<string,string> = { rect:"矩形","rounded-rect":"圆角矩形",ellipse:"椭圆",diamond:"菱形",triangle:"三角形",hexagon:"六边形",parallelogram:"平行四边形",trapezoid:"梯形",pentagon:"五边形",star:"五角星",cross:"十字形","arrow-right":"箭头",callout:"标注",cylinder:"数据库",document:"文档",cloud:"云形",terminal:"终止","manual-input":"手工输入","off-page":"页外引用",preparation:"准备",delay:"延迟","uml-class":"类","uml-interface":"接口","uml-note":"注释",actor:"参与者","use-case":"用例",component:"组件",lifeline:"生命线","er-entity":"实体","er-attr":"属性","er-relation":"关系","er-weak-entity":"弱实体",server:"服务器",database2:"数据库",router:"路由器",firewall:"防火墙","cloud-aws":"云",mobile:"手机",monitor:"显示器" };
 
   if (loading || authLoading) {
-    return <div className="min-h-screen bg-white flex items-center justify-center"><div className="animate-spin w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full" /></div>;
+    return <div className="min-h-screen bg-white flex items-center justify-center"><div className="animate-spin w-8 h-8 border-2 border-gray-500 border-t-transparent rounded-full" /></div>;
   }
 
   const eng = engineRef.current;
@@ -853,7 +872,7 @@ export default function EditorPage() {
           <Separator orientation="vertical" className="h-5 mx-1" />
           <div className="flex items-center gap-0.5 border border-gray-200 rounded px-1.5 py-0.5">
             <button onClick={handleZoomOut} className="h-5 w-5 flex items-center justify-center rounded hover:bg-gray-100 text-gray-500"><ZoomOut className="w-3 h-3" /></button>
-            <span className="text-xs font-medium min-w-[2.5rem] text-center cursor-pointer" onClick={() => { if (eng) { eng.zoom = 1; eng.panX = 0; eng.panY = 0; eng.render(); } }}>
+            <span className="text-xs font-medium min-w-[2.5rem] text-center cursor-pointer" onClick={() => { if (eng) { eng.zoom = 1; eng.panX = 0; eng.panY = 0; eng.render(); setEngineVersion(v => v + 1); } }}>
               {eng ? Math.round(eng.zoom * 100) + "%" : "100%"}
             </span>
             <button onClick={handleZoomIn} className="h-5 w-5 flex items-center justify-center rounded hover:bg-gray-100 text-gray-500"><ZoomIn className="w-3 h-3" /></button>
@@ -1097,7 +1116,7 @@ export default function EditorPage() {
                   <div className="p-2 space-y-0.5">
                     {[
                       { label: "添加子节点", kd: "Tab", action: () => { if (eng.sel.size) { eng.pu(); eng.addMMChild([...eng.sel][0]); } } },
-                      { label: "添加同级节点", kd: "Enter", action: () => { if (eng.sel.size) { const n = eng.gn([...eng.sel][0]); if (n?.parentId) { eng.pu(); const s = eng.mkNode("mindmap", 0, 0, n.parentId); s.text = "同级节点"; eng.nodes.push(s); eng.layoutMM(); eng.applyMMTheme(); eng.selN(s.id); eng.render(); } else eng.initMM(); } } },
+                      { label: "添加同级节点", kd: "Enter", action: () => { if (eng.sel.size) { const n = eng.gn([...eng.sel][0]); if (n?.parentId) { eng.pu(); const s = eng.mkNode("mindmap", 0, 0, n.parentId); s.text = "同级节点"; eng.nodes.push(s); eng.layoutMM(); eng.applyMMTheme(); eng.selN(s.id); eng.render(); } else { eng.pu(); eng.mkMMRoot(200, eng.nodes.filter(n2 => n2.isMM && !n2.parentId).length * 300 + 120); eng.layoutMM(); eng.render(); } } } },
                       { label: "新建导图", action: () => { eng.pu(); eng.mkMMRoot(200, eng.nodes.filter(n => n.isMM && !n.parentId).length * 300 + 120); eng.layoutMM(); eng.render(); } },
                       { label: "删除节点", kd: "Del", action: delSel },
                     ].map((b, i) => (
@@ -1159,7 +1178,7 @@ export default function EditorPage() {
               defaultValue=""
               onBlur={handleIEditBlur}
               onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); (e.target as HTMLElement).blur(); } if (e.key === "Escape") { handleIEditBlur(); } }}
-              className="absolute hidden border-2 border-indigo-500 rounded px-2 py-0.5 text-sm outline-none bg-white shadow-lg z-50"
+              className="absolute hidden border-2 border-gray-700 rounded px-2 py-0.5 text-sm outline-none bg-white shadow-lg z-50"
               style={{ fontFamily: "'PingFang SC',sans-serif" }}
             />
           </div>

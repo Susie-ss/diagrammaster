@@ -251,8 +251,9 @@ export class DiagramEngine {
     const p = toCv(mx, my, this.canvas!, this.zoom, this.panX, this.panY);
     for (let i = this.nodes.length - 1; i >= 0; i--) {
       const n = this.nodes[i];
-      if (n.isMM && this.mode !== "mindmap") continue;
-      if (!n.isMM && this.mode === "mindmap") continue;
+      if (this.mode === "freedraw" && !n.isFD) continue;
+      if (this.mode === "mindmap" && !n.isMM) continue;
+      if (this.mode === "flowchart" && (n.isMM || n.isFD)) continue;
       if (this.htN(n, p.x, p.y)) return n;
     }
     return null;
@@ -293,12 +294,17 @@ export class DiagramEngine {
   render() {
     if (!this.canvas || !this.ctx) return;
     const ctx = this.ctx;
-    ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    const dpr = window.devicePixelRatio || 1;
+    const cw = this.canvas.width / dpr;
+    const ch = this.canvas.height / dpr;
+    ctx.save();
+    ctx.scale(dpr, dpr);
+    ctx.clearRect(0, 0, cw, ch);
     ctx.save();
 
     // 背景填充白色
     ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    ctx.fillRect(0, 0, cw, ch);
 
     // Grid — 主题色网格
     if (this.showGrid && this.zoom > 0.25) {
@@ -306,8 +312,8 @@ export class DiagramEngine {
       const gs = this.gs * this.zoom;
       const sx = ((this.panX % gs) + gs) % gs, sy = ((this.panY % gs) + gs) % gs;
       ctx.strokeStyle = t.gridColor; ctx.lineWidth = 0.5; ctx.beginPath();
-      for (let x = sx; x < this.canvas.width; x += gs) { ctx.moveTo(x, 0); ctx.lineTo(x, this.canvas.height); }
-      for (let y = sy; y < this.canvas.height; y += gs) { ctx.moveTo(0, y); ctx.lineTo(this.canvas.width, y); }
+      for (let x = sx; x < cw; x += gs) { ctx.moveTo(x, 0); ctx.lineTo(x, ch); }
+      for (let y = sy; y < ch; y += gs) { ctx.moveTo(0, y); ctx.lineTo(cw, y); }
       ctx.stroke();
     }
 
@@ -568,7 +574,7 @@ export class DiagramEngine {
     // Selection handles — 白底蓝边的小方块
     if (sel && !this.dragging) {
       ctx.shadowColor = "transparent"; ctx.shadowBlur = 0;
-      ctx.fillStyle = "#fff"; ctx.strokeStyle = "#5b6cf2"; ctx.lineWidth = 1.5;
+      ctx.fillStyle = "#fff"; ctx.strokeStyle = "#374151"; ctx.lineWidth = 1.5;
       const hs = [
         { x, y }, { x: x + w, y }, { x, y: y + h }, { x: x + w, y: y + h },
         { x: cx, y }, { x: cx, y: y + h }, { x, y: cy }, { x: x + w, y: cy }
