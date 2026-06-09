@@ -340,6 +340,14 @@ export default function EditorPage() {
       return;
     }
 
+    // Right-click drag pan
+    if (ev.button === 2) {
+      ev.preventDefault();
+      e.panning = true;
+      e.ds = { x: ev.clientX, y: ev.clientY, panX: e.panX, panY: e.panY };
+      return;
+    }
+
     const r = wrapRef.current!.getBoundingClientRect();
     const cpx = (ev.clientX - r.left - e.panX) / e.zoom;
     const cpy = (ev.clientY - r.top - e.panY) / e.zoom;
@@ -1170,7 +1178,8 @@ export default function EditorPage() {
             onMouseUp={handleCanvasMouseUp}
             onWheel={handleWheel}
             onDoubleClick={handleDblClick}
-            style={{ cursor: eng?.spaceDown ? "grab" : (eng?.mode === "freedraw" && eng?.freeDrawEraser ? "crosshair" : (eng?.mode === "freedraw" && eng?.freeDrawSubTool === "text" ? "text" : (eng?.mode === "freedraw" ? "crosshair" : eng?.linking ? "crosshair" : "default"))) }}
+            onContextMenu={(e) => e.preventDefault()}
+            style={{ cursor: eng?.panning ? "grabbing" : eng?.spaceDown ? "grab" : (eng?.mode === "freedraw" && eng?.freeDrawEraser ? "crosshair" : (eng?.mode === "freedraw" && eng?.freeDrawSubTool === "text" ? "text" : (eng?.mode === "freedraw" ? "crosshair" : eng?.linking ? "crosshair" : "default"))) }}
           >
             <canvas ref={canvasRef} className="absolute inset-0" />
             <input
