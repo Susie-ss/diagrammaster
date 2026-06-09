@@ -69,9 +69,11 @@ export default function EditorPage() {
   const [searchShapes, setSearchShapes] = useState("");
 
   // Free draw state
+  const [fdSubTool, setFDSubTool] = useState("pencil"); // pointer | rectangle | line | pencil | text
   const [fdTool, setFDTool] = useState("pen");
   const [fdColor, setFDColor] = useState("#1e293b");
   const [fdWidth, setFDWidth] = useState(2);
+  const [fdFill, setFDFill] = useState(false);
   const [fdEraser, setFDEraser] = useState(false);
   const [fdEraserSize, setFDEraserSize] = useState(24);
   const [fdMousePos, setFDMousePos] = useState<{x:number;y:number}|null>(null);
@@ -225,12 +227,14 @@ export default function EditorPage() {
   // Sync freedraw state to engine
   useEffect(() => {
     const e = engineRef.current; if (!e) return;
+    e.freeDrawSubTool = fdSubTool;
     e.freeDrawTool = fdTool;
     e.freeDrawColor = fdColor;
     e.freeDrawWidth = fdWidth;
+    e.freeDrawFill = fdFill;
     e.freeDrawEraser = fdEraser;
     e.eraserSize = fdEraserSize;
-  }, [fdTool, fdColor, fdWidth, fdEraser, fdEraserSize]);
+  }, [fdSubTool, fdTool, fdColor, fdWidth, fdFill, fdEraser, fdEraserSize]);
 
   // Resize & ResizeObserver
   useEffect(() => {
@@ -342,12 +346,69 @@ export default function EditorPage() {
 
     // Free draw / eraser mode
     if (e.mode === "freedraw") {
-      if (e.freeDrawEraser) {
+      if (e.freeDrawEraser && e.freeDrawSubTool === "pencil") {
         e.pu();
         e.eraseAtPoint(cpx, cpy);
         e.render();
-      } else {
+        return;
+      }
+      if (e.freeDrawSubTool === "pencil") {
         e.startFreeDraw(cpx, cpy);
+        return;
+      }
+      if (e.freeDrawSubTool === "rectangle") {
+        e.startRectDraw(cpx, cpy);
+        return;
+      }
+      if (e.freeDrawSubTool === "line") {
+        e.startLineDraw(cpx, cpy);
+        return;
+      }
+      if (e.freeDrawSubTool === "text") {
+        const n = e.addTextAt(cpx - 70, cpy - 20, "双击编辑");
+        e.selN(n.id);
+        refP(e);
+        // Open inline edit
+        if (ieRef.current && canvasRef.current) {
+          ieRef.current.style.display = "block";
+          ieRef.current.value = n.text || "";
+          ieRef.current.style.left = (n.x * e.zoom + e.panX) + "px";
+          ieRef.current.style.top = (n.y * e.zoom + e.panY) + "px";
+          ieRef.current.style.width = Math.max(n.width * e.zoom, 80) + "px";
+          ieRef.current.style.height = Math.max(n.height * e.zoom, 28) + "px";
+          ieRef.current.style.fontSize = (n.fs * e.zoom) + "px";
+          ieRef.current.focus();
+          ieRef.current.select();
+          ieRef.current.dataset.nodeId = n.id;
+        }
+        return;
+      }
+      if (e.freeDrawSubTool === "pointer") {
+        // Hit test for node selection/drag
+        const hn = e.hitN(ev.clientX, ev.clientY);
+        if (hn) {
+          const additive = ev.shiftKey || ev.metaKey;
+          if (additive) {
+            if (e.sel.has(hn.id)) e.sel.delete(hn.id);
+            else e.sel.add(hn.id);
+          } else if (!e.sel.has(hn.id)) {
+            e.selN(hn.id);
+          }
+          e.dragging = true;
+          e.ds = {
+            x: ev.clientX, y: ev.clientY,
+            nodes: [...e.sel].map(id => e.gn(id)).filter(Boolean).map((n: any) => ({ id: n.id, x: n.x, y: n.y }))
+          };
+          e.pu();
+          refP(e);
+          e.render();
+        } else {
+          // Empty area → marquee select
+          if (!(ev.shiftKey || ev.metaKey)) { e.sel.clear(); e.selConn = null; }
+          e.startMarquee(cpx, cpy);
+          refP(e);
+        }
+        return;
       }
       return;
     }
@@ -406,16 +467,28 @@ export default function EditorPage() {
     const cpy = (ev.clientY - r.top - e.panY) / e.zoom;
 
     // Free draw eraser: continuous erase
-    if (e.mode === "freedraw" && e.freeDrawEraser && ev.buttons === 1) {
+    if (e.mode === "freedraw" && e.freeDrawEraser && e.freeDrawSubTool === "pencil" && ev.buttons === 1) {
       e.eraseAtPoint(cpx, cpy);
       e.render();
       setFDMousePos({ x: cpx, y: cpy });
       return;
     }
 
-    // Free draw continue
-    if (e.drawing) {
+    // Free draw continue (pencil)
+    if (e.drawing && e.mode === "freedraw" && e.freeDrawSubTool === "pencil") {
       e.continueFreeDraw(cpx, cpy);
+      return;
+    }
+
+    // Rectangle continue
+    if (e.drawingRect) {
+      e.continueRectDraw(cpx, cpy);
+      return;
+    }
+
+    // Line continue
+    if (e.drawingLine) {
+      e.continueLineDraw(cpx, cpy);
       return;
     }
 
@@ -444,8 +517,21 @@ export default function EditorPage() {
     const e = engineRef.current; if (!e) return;
 
     // End free draw
-    if (e.drawing) {
+    if (e.drawing && e.mode === "freedraw") {
       e.endFreeDraw();
+      return;
+    }
+
+    // End rect draw
+    if (e.drawingRect) {
+      e.endRectDraw();
+      refP(e);
+      return;
+    }
+
+    // End line draw
+    if (e.drawingLine) {
+      e.endLineDraw();
       return;
     }
 
@@ -547,6 +633,15 @@ export default function EditorPage() {
           ev.preventDefault();
           e?.setSpaceDown(true);
           setEngineVersion(v => v + 1);
+        }
+      }
+      // Number keys: switch freedraw sub-tool (1-5)
+      if (e && e.mode === "freedraw" && ["1","2","3","4","5"].includes(ev.key)) {
+        const subTools = ["pointer","rectangle","line","pencil","text"] as const;
+        const idx = parseInt(ev.key) - 1;
+        if (idx >= 0 && idx < subTools.length) {
+          setFDSubTool(subTools[idx]);
+          if (subTools[idx] !== "pencil") setFDEraser(false);
         }
       }
     };
@@ -766,94 +861,212 @@ export default function EditorPage() {
         </div>
       </div>
 
+      {/* ===== FREEDRAW SUB-TOOLBAR (only in freedraw mode) ===== */}
+      {eng?.mode === "freedraw" && (
+        <div className="h-10 bg-white border-b border-gray-200 flex items-center px-4 gap-2 shrink-0">
+          <span className="text-[10px] text-gray-400 font-medium mr-1">工具</span>
+          {([
+            { id: "pointer", icon: MousePointer, label: "指针", num: "1" },
+            { id: "rectangle", icon: "□", label: "矩形", num: "2" },
+            { id: "line", icon: "╲", label: "直线", num: "3" },
+            { id: "pencil", icon: Pen, label: "画笔", num: "4" },
+            { id: "text", icon: Type, label: "文字", num: "5" },
+          ] as const).map((t, i) => (
+            <button key={t.id}
+              onClick={() => { setFDSubTool(t.id); if (t.id !== "pencil") setFDEraser(false); }}
+              className={`h-7 px-2.5 text-xs rounded transition-colors flex items-center gap-1.5 ${
+                fdSubTool === t.id && !(t.id === "pencil" && fdEraser)
+                  ? "bg-gray-900 text-white"
+                  : "text-gray-500 hover:bg-gray-100"
+              }`}
+              title={`${t.label} (${t.num})`}
+            >
+              {t.icon === MousePointer ? <t.icon className="w-3.5 h-3.5" /> :
+               typeof t.icon === "string"
+                 ? <span className="text-sm leading-none">{t.icon}</span>
+                 : <t.icon className="w-3.5 h-3.5" />}
+              <span>{t.label}</span>
+              <span className={`text-[10px] ml-0.5 ${fdSubTool === t.id && !(t.id === "pencil" && fdEraser) ? "text-gray-300" : "text-gray-400"}`}>{t.num}</span>
+            </button>
+          ))}
+
+          <Separator orientation="vertical" className="h-6 mx-1" />
+
+          {/* Eraser toggle (only relevant for pencil) */}
+          {fdSubTool === "pencil" && (
+            <button
+              onClick={() => setFDEraser(!fdEraser)}
+              className={`h-7 px-2 text-xs rounded transition-colors flex items-center gap-1 ${
+                fdEraser ? "bg-red-500 text-white" : "text-gray-500 hover:bg-gray-100"
+              }`}
+              title="橡皮擦"
+            >
+              <Eraser className="w-3.5 h-3.5" />
+              橡皮擦
+            </button>
+          )}
+
+          {(fdSubTool === "rectangle" || fdSubTool === "line" || fdSubTool === "pencil" || fdSubTool === "text") && (
+            <>
+              <Separator orientation="vertical" className="h-6 mx-1" />
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] text-gray-400">描边</span>
+                <input type="color" value={fdColor} onChange={e => setFDColor(e.target.value)}
+                  className="w-5 h-5 rounded cursor-pointer border border-gray-300 p-0" />
+                <span className="text-[10px] text-gray-400 ml-0.5">粗细</span>
+                <input type="range" min={1} max={8} step={0.5} value={fdWidth}
+                  onChange={e => setFDWidth(+e.target.value)}
+                  className="w-16 h-1 accent-gray-900" />
+                <span className="text-[10px] text-gray-500 w-5">{fdWidth}</span>
+                {fdSubTool === "rectangle" && (
+                  <label className="flex items-center gap-1 text-[10px] text-gray-500 cursor-pointer ml-1">
+                    <input type="checkbox" checked={fdFill} onChange={e => setFDFill(e.target.checked)}
+                      className="w-3 h-3 rounded accent-gray-900" />
+                    填充
+                  </label>
+                )}
+              </div>
+            </>
+          )}
+
+          <span className="ml-auto text-[10px] text-gray-400">
+            提示: 数字键 1-5 切换工具 · 空格拖拽画布 · 滚轮缩放
+          </span>
+        </div>
+      )}
+
       {/* ===== MAIN ===== */}
       <div className="flex flex-1 overflow-hidden">
         {/* Left Panel */}
         {leftPanelOpen && eng?.mode === "freedraw" && (
           <div className="w-56 bg-gray-50 border-r border-gray-200 overflow-y-auto shrink-0">
             <div className="p-3 space-y-3">
-              {/* Brush tool selector */}
-              <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
-                <div className="px-3 py-2 text-xs font-medium text-gray-700 bg-gray-100/50 border-b border-gray-200">画笔工具</div>
-                <div className="p-2 space-y-0.5">
-                  {[
-                    { id: "pen", icon: Pen, label: "钢笔", desc: "平滑线条" },
-                    { id: "marker", icon: PaintBucket, label: "马克笔", desc: "粗线条" },
-                    { id: "pencil", icon: Pencil, label: "铅笔", desc: "细线条" },
-                  ].map(t => (
-                    <button key={t.id}
-                      onClick={() => { setFDTool(t.id); setFDEraser(false); }}
-                      className={`w-full flex items-center gap-2 px-2.5 py-1.5 text-xs rounded transition-colors ${fdTool === t.id && !fdEraser ? "bg-gray-100 text-gray-900 font-medium" : "text-gray-600 hover:bg-gray-50"}`}
-                    >
-                      <t.icon className="w-3.5 h-3.5" />
-                      <div className="text-left">
-                        <div>{t.label}</div>
-                        <div className="text-[10px] text-gray-400">{t.desc}</div>
-                      </div>
-                    </button>
-                  ))}
-                  <button
-                    onClick={() => { setFDEraser(!fdEraser); if (!fdEraser) setFDTool("pen"); }}
-                    className={`w-full flex items-center gap-2 px-2.5 py-1.5 text-xs rounded transition-colors ${fdEraser ? "bg-gray-100 text-gray-900 font-medium" : "text-gray-600 hover:bg-gray-50"}`}
-                  >
-                    <Eraser className="w-3.5 h-3.5" />
-                    <div className="text-left">
-                      <div>橡皮擦</div>
-                      <div className="text-[10px] text-gray-400">擦除线条</div>
+              {/* Pencil-only options */}
+              {fdSubTool === "pencil" && (
+                <>
+                  <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
+                    <div className="px-3 py-2 text-xs font-medium text-gray-700 bg-gray-100/50 border-b border-gray-200">画笔工具</div>
+                    <div className="p-2 space-y-0.5">
+                      {[
+                        { id: "pen", icon: Pen, label: "钢笔", desc: "平滑线条" },
+                        { id: "marker", icon: PaintBucket, label: "马克笔", desc: "粗线条" },
+                        { id: "pencil", icon: Pencil, label: "铅笔", desc: "细线条" },
+                      ].map(t => (
+                        <button key={t.id}
+                          onClick={() => { setFDTool(t.id); setFDEraser(false); }}
+                          className={`w-full flex items-center gap-2 px-2.5 py-1.5 text-xs rounded transition-colors ${fdTool === t.id && !fdEraser ? "bg-gray-100 text-gray-900 font-medium" : "text-gray-600 hover:bg-gray-50"}`}
+                        >
+                          <t.icon className="w-3.5 h-3.5" />
+                          <div className="text-left">
+                            <div>{t.label}</div>
+                            <div className="text-[10px] text-gray-400">{t.desc}</div>
+                          </div>
+                        </button>
+                      ))}
+                      <button
+                        onClick={() => setFDEraser(!fdEraser)}
+                        className={`w-full flex items-center gap-2 px-2.5 py-1.5 text-xs rounded transition-colors ${fdEraser ? "bg-gray-100 text-gray-900 font-medium" : "text-gray-600 hover:bg-gray-50"}`}
+                      >
+                        <Eraser className="w-3.5 h-3.5" />
+                        <div className="text-left">
+                          <div>橡皮擦</div>
+                          <div className="text-[10px] text-gray-400">擦除线条</div>
+                        </div>
+                      </button>
                     </div>
-                  </button>
-                </div>
-              </div>
+                  </div>
 
-              {/* Color picker */}
-              {!fdEraser && (
+                  <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
+                    <div className="px-3 py-2 text-xs font-medium text-gray-700 bg-gray-100/50 border-b border-gray-200 flex items-center gap-1.5">
+                      <Palette className="w-3 h-3" />颜色
+                    </div>
+                    <div className="p-2">
+                      <div className="flex gap-1 mb-2">
+                        <input type="color" value={fdColor} onChange={e => setFDColor(e.target.value)}
+                          className="w-8 h-8 rounded cursor-pointer border border-gray-300 p-0.5" />
+                        <input value={fdColor} onChange={e => setFDColor(e.target.value)}
+                          className="flex-1 h-8 bg-white border border-gray-300 rounded px-2 text-xs font-mono text-gray-900" />
+                      </div>
+                      <div className="grid grid-cols-7 gap-1">
+                        {["#1e293b","#475569","#64748b","#ef4444","#f97316","#eab308","#22c55e","#3b82f6","#8b5cf6","#ec4899","#78716c","#000000","#ffffff","#9ca3af"].map(c => (
+                          <button key={c} onClick={() => setFDColor(c)}
+                            className="w-6 h-6 rounded border transition-transform hover:scale-110"
+                            style={{ backgroundColor: c, borderColor: fdColor === c ? "#374151" : "#d1d5db", borderWidth: fdColor === c ? 2 : 1 }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="border border-gray-200 rounded-lg bg-white p-2.5">
+                    <div className="text-xs font-medium text-gray-700 mb-2">
+                      {fdEraser ? "橡皮擦大小" : "笔触粗细"}
+                    </div>
+                    <input type="range"
+                      min={1} max={fdEraser ? 60 : 12} step={0.5}
+                      value={fdEraser ? fdEraserSize : fdWidth}
+                      onChange={e => fdEraser ? setFDEraserSize(+e.target.value) : setFDWidth(+e.target.value)}
+                      className="w-full h-1 accent-gray-900 mb-1"
+                    />
+                    <div className="text-[10px] text-gray-500 text-right">
+                      {fdEraser ? `${fdEraserSize}px` : `${fdWidth}px`}
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* Shape/Licne styling options */}
+              {(fdSubTool === "rectangle" || fdSubTool === "line" || fdSubTool === "text") && (
                 <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
                   <div className="px-3 py-2 text-xs font-medium text-gray-700 bg-gray-100/50 border-b border-gray-200 flex items-center gap-1.5">
-                    <Palette className="w-3 h-3" />颜色
+                    <Palette className="w-3 h-3" />{fdSubTool === "rectangle" ? "矩形样式" : fdSubTool === "line" ? "线条样式" : "文字样式"}
                   </div>
-                  <div className="p-2">
-                    <div className="flex gap-1 mb-2">
+                  <div className="p-2 space-y-2">
+                    <div className="flex items-center gap-1.5">
                       <input type="color" value={fdColor} onChange={e => setFDColor(e.target.value)}
                         className="w-8 h-8 rounded cursor-pointer border border-gray-300 p-0.5" />
                       <input value={fdColor} onChange={e => setFDColor(e.target.value)}
-                        className="flex-1 h-8 bg-white border border-gray-300 rounded px-2 text-xs font-mono text-gray-900" />
+                        className="flex-1 h-7 bg-white border border-gray-300 rounded px-2 text-xs font-mono text-gray-900" />
                     </div>
-                    <div className="grid grid-cols-7 gap-1">
-                      {["#1e293b","#475569","#64748b","#ef4444","#f97316","#eab308","#22c55e","#3b82f6","#8b5cf6","#ec4899","#78716c","#000000","#ffffff","#9ca3af"].map(c => (
-                        <button key={c} onClick={() => setFDColor(c)}
-                          className="w-6 h-6 rounded border transition-transform hover:scale-110"
-                          style={{ backgroundColor: c, borderColor: fdColor === c ? "#374151" : "#d1d5db", borderWidth: fdColor === c ? 2 : 1 }}
-                        />
-                      ))}
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] text-gray-500 w-5">粗细</span>
+                      <input type="range" min={1} max={8} step={0.5} value={fdWidth}
+                        onChange={e => setFDWidth(+e.target.value)}
+                        className="flex-1 h-1 accent-gray-900" />
+                      <span className="text-[10px] text-gray-500 w-6 text-right">{fdWidth}px</span>
                     </div>
+                    {fdSubTool === "rectangle" && (
+                      <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer">
+                        <input type="checkbox" checked={fdFill} onChange={e => setFDFill(e.target.checked)}
+                          className="w-3.5 h-3.5 rounded accent-gray-900" />
+                        填充半透明
+                      </label>
+                    )}
                   </div>
                 </div>
               )}
 
-              {/* Brush width or eraser size */}
-              <div className="border border-gray-200 rounded-lg bg-white p-2.5">
-                <div className="text-xs font-medium text-gray-700 mb-2">
-                  {fdEraser ? "橡皮擦大小" : "笔触粗细"}
+              {/* Pointer info */}
+              {fdSubTool === "pointer" && (
+                <div className="border border-gray-200 rounded-lg bg-white p-3">
+                  <div className="text-xs text-gray-500 leading-relaxed">
+                    <p className="font-medium text-gray-700 mb-1">指针工具</p>
+                    <p>点击选择元素</p>
+                    <p>拖拽移动元素</p>
+                    <p>拖拽空白区域框选</p>
+                    <p className="mt-1 text-[10px] text-gray-400">Shift+点击 多选 · 空格+拖拽 平移</p>
+                  </div>
                 </div>
-                <input type="range"
-                  min={1} max={fdEraser ? 60 : 12} step={0.5}
-                  value={fdEraser ? fdEraserSize : fdWidth}
-                  onChange={e => fdEraser ? setFDEraserSize(+e.target.value) : setFDWidth(+e.target.value)}
-                  className="w-full h-1 accent-gray-900 mb-1"
-                />
-                <div className="text-[10px] text-gray-500 text-right">
-                  {fdEraser ? `${fdEraserSize}px` : `${fdWidth}px`}
-                </div>
-              </div>
+              )}
 
               {/* Clear all */}
               <button
                 onClick={() => {
-                  const e = engineRef.current;
-                  if (!e) return;
-                  e.pu();
-                  e.paths = [];
-                  e.render();
+                  const e2 = engineRef.current;
+                  if (!e2) return;
+                  e2.pu();
+                  e2.paths = [];
+                  e2.render();
                   toast("已清除所有手绘");
                 }}
                 className="w-full py-1.5 text-xs text-red-500 hover:bg-red-50 border border-red-200 rounded-lg transition-colors"
@@ -938,7 +1151,7 @@ export default function EditorPage() {
             onMouseUp={handleCanvasMouseUp}
             onWheel={handleWheel}
             onDoubleClick={handleDblClick}
-            style={{ cursor: eng?.spaceDown ? "grab" : (eng?.mode === "freedraw" && eng?.freeDrawEraser ? "crosshair" : (eng?.mode === "freedraw" ? "crosshair" : eng?.linking ? "crosshair" : "default")) }}
+            style={{ cursor: eng?.spaceDown ? "grab" : (eng?.mode === "freedraw" && eng?.freeDrawEraser ? "crosshair" : (eng?.mode === "freedraw" && eng?.freeDrawSubTool === "text" ? "text" : (eng?.mode === "freedraw" ? "crosshair" : eng?.linking ? "crosshair" : "default"))) }}
           >
             <canvas ref={canvasRef} className="absolute inset-0" />
             <input
@@ -955,7 +1168,7 @@ export default function EditorPage() {
           <div className="h-7 bg-gray-50 border-t border-gray-200 flex items-center px-3 text-xs text-gray-500 shrink-0">
             <span>准备就绪</span>
             <Separator orientation="vertical" className="h-4 mx-2" />
-            <span>模式: {eng?.mode === "mindmap" ? "思维导图" : eng?.mode === "flowchart" ? "流程图" : "自由绘图"}</span>
+            <span>模式: {eng?.mode === "mindmap" ? "思维导图" : eng?.mode === "flowchart" ? "流程图" : `自由绘图 · ${fdSubTool === "pointer" ? "指针" : fdSubTool === "rectangle" ? "矩形" : fdSubTool === "line" ? "直线" : fdSubTool === "pencil" ? "画笔" : "文字"}`}</span>
             <span className="ml-auto text-gray-400">
               {eng ? `元素: ${eng.nodes.length} · 连线: ${eng.conns.length} · ${Math.round(eng.zoom * 100)}%` : ""}
             </span>

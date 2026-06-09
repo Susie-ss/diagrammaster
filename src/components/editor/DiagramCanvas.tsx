@@ -195,7 +195,10 @@ export class DiagramEngine {
   marqueeMode = "partial"; marqueeActive = false; marqueeStart: {x:number;y:number} | null = null; marqueeEnd: {x:number;y:number} | null = null;
   fmtBrush: any = null; fmtBrushOn = false;
   // Free draw
-  freeDrawTool = "pen"; freeDrawColor = "#1e293b"; freeDrawWidth = 2; freeDrawEraser = false; eraserSize = 24;
+  freeDrawSubTool = "pencil"; freeDrawTool = "pen"; freeDrawColor = "#1e293b"; freeDrawWidth = 2; freeDrawEraser = false; freeDrawFill = false; eraserSize = 24;
+  drawingRect = false; drawingLine = false;
+  rectStart: {x:number;y:number} | null = null; rectPreview: {x:number;y:number;w:number;h:number} | null = null;
+  lineStart: {x:number;y:number} | null = null; linePreview: {sx:number;sy:number;ex:number;ey:number} | null = null;
   canvas: HTMLCanvasElement | null = null; ctx: CanvasRenderingContext2D | null = null;
   onToast?: (msg: string) => void;
   onStateChange?: (state: DiagramState) => void;
@@ -348,6 +351,29 @@ export class DiagramEngine {
       ctx.strokeStyle = "#3b82f6"; ctx.lineWidth = 1;
       ctx.fillStyle = "rgba(59,130,246,0.08)";
       ctx.beginPath(); ctx.rect(x, y, w, h); ctx.fill(); ctx.stroke();
+    }
+
+    // Rectangle preview (freedraw sub-tool)
+    if (this.drawingRect && this.rectPreview) {
+      ctx.setLineDash([]);
+      ctx.strokeStyle = this.freeDrawColor; ctx.lineWidth = this.freeDrawWidth;
+      ctx.fillStyle = this.freeDrawFill ? (this.freeDrawColor + "18") : "transparent";
+      const rp = this.rectPreview;
+      if (rp.w < 0) { rp.x += rp.w; rp.w = -rp.w; }
+      if (rp.h < 0) { rp.y += rp.h; rp.h = -rp.h; }
+      ctx.beginPath(); rrP(ctx, rp.x, rp.y, rp.w, rp.h, 0); ctx.fill(); ctx.stroke();
+    }
+
+    // Line preview (freedraw sub-tool)
+    if (this.drawingLine && this.linePreview) {
+      ctx.setLineDash([6, 4]);
+      ctx.strokeStyle = this.freeDrawColor; ctx.lineWidth = this.freeDrawWidth;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(this.linePreview.sx, this.linePreview.sy);
+      ctx.lineTo(this.linePreview.ex, this.linePreview.ey);
+      ctx.stroke();
+      ctx.setLineDash([]);
     }
 
     // Eraser cursor preview
@@ -753,6 +779,80 @@ export class DiagramEngine {
       }
       if (!keep) { this.curPath = null; this.drawing = false; }
     }
+  }
+
+  // ======================== RECTANGLE DRAW (freedraw sub-tool) ========================
+  startRectDraw(px: number, py: number) {
+    this.drawingRect = true;
+    this.rectStart = { x: px, y: py };
+    this.rectPreview = { x: px, y: py, w: 0, h: 0 };
+  }
+  continueRectDraw(px: number, py: number) {
+    if (!this.drawingRect || !this.rectStart) return;
+    this.rectPreview = {
+      x: Math.min(this.rectStart.x, px),
+      y: Math.min(this.rectStart.y, py),
+      w: Math.abs(px - this.rectStart.x),
+      h: Math.abs(py - this.rectStart.y)
+    };
+    this.render();
+  }
+  endRectDraw() {
+    if (!this.drawingRect || !this.rectPreview) { this.drawingRect = false; this.rectStart = null; this.rectPreview = null; return; }
+    this.drawingRect = false;
+    if (this.rectPreview.w > 4 && this.rectPreview.h > 4) {
+      this.pu();
+      const n: DiagramNode = {
+        id: gid(), type: "rect",
+        x: this.rectPreview.x, y: this.rectPreview.y, width: this.rectPreview.w, height: this.rectPreview.h,
+        fill: this.freeDrawFill ? (this.freeDrawColor + "18") : "transparent", stroke: this.freeDrawColor, sw: this.freeDrawWidth,
+        ls: "solid", cr: 0, opacity: 100,
+        text: "", fs: 13, ff: "PingFang SC", fb: false, fi: false, fu: false, fc: NODE_TEXT, ta: "center",
+        parentId: null, collapsed: false, rot: 0, isMM: false, isSw: false
+      };
+      this.nodes.push(n);
+    }
+    this.rectStart = null; this.rectPreview = null; this.render();
+  }
+
+  // ======================== LINE DRAW (freedraw sub-tool) ========================
+  startLineDraw(px: number, py: number) {
+    this.drawingLine = true;
+    this.lineStart = { x: px, y: py };
+    this.linePreview = { sx: px, sy: py, ex: px, ey: py };
+  }
+  continueLineDraw(px: number, py: number) {
+    if (!this.drawingLine || !this.lineStart) return;
+    this.linePreview = { sx: this.lineStart.x, sy: this.lineStart.y, ex: px, ey: py };
+    this.render();
+  }
+  endLineDraw() {
+    if (!this.drawingLine || !this.lineStart || !this.linePreview) { this.drawingLine = false; this.lineStart = null; this.linePreview = null; return; }
+    this.drawingLine = false;
+    const dist = Math.hypot(this.linePreview.ex - this.lineStart.x, this.linePreview.ey - this.lineStart.y);
+    if (dist > 4) {
+      this.pu();
+      this.paths.push({
+        id: gid(), tool: "line", color: this.freeDrawColor, width: this.freeDrawWidth,
+        pts: [{ x: this.lineStart.x, y: this.lineStart.y }, { x: this.linePreview.ex, y: this.linePreview.ey }]
+      });
+    }
+    this.lineStart = null; this.linePreview = null; this.render();
+  }
+
+  // ======================== TEXT ADD (freedraw sub-tool) ========================
+  addTextAt(px: number, py: number, text: string): DiagramNode {
+    this.pu();
+    const n: DiagramNode = {
+      id: gid(), type: "rect",
+      x: px, y: py, width: 140, height: 40,
+      fill: "transparent", stroke: "transparent", sw: 0, ls: "solid", cr: 0, opacity: 100,
+      text: text || "双击编辑", fs: 16, ff: "PingFang SC", fb: false, fi: false, fu: false, fc: this.freeDrawColor, ta: "left",
+      parentId: null, collapsed: false, rot: 0, isMM: false, isSw: false
+    };
+    this.nodes.push(n);
+    this.render();
+    return n;
   }
 
   // ======================== MARQUEE SELECTION ========================
