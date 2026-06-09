@@ -645,6 +645,9 @@ export default function EditorPage() {
       if (m && ev.key === "z") { ev.preventDefault(); handleUndo(); return; }
       if (m && (ev.key === "y" || (ev.key === "z" && ev.shiftKey))) { ev.preventDefault(); handleRedo(); return; }
       if ((ev.key === "Delete" || ev.key === "Backspace") && e && (e.sel.size > 0 || e.selConn)) { ev.preventDefault(); delSel(); return; }
+      if (m && ev.key === "c" && e) { ev.preventDefault(); e.copy(); return; }
+      if (m && ev.key === "x" && e) { ev.preventDefault(); e.cut(); return; }
+      if (m && ev.key === "v" && e) { ev.preventDefault(); e.paste(); return; }
       if (m && ev.key === "e") { ev.preventDefault(); setShowExportModal(true); return; }
       if (ev.key === "Escape" && e) {
         e.linking = null; e.render();
@@ -827,9 +830,9 @@ export default function EditorPage() {
 
         {/* Edit */}
         <div className="flex items-center gap-0.5">
-          <button className="h-7 w-7 flex items-center justify-center rounded hover:bg-gray-100 text-gray-400" title="剪切"><Scissors className="w-3.5 h-3.5" /></button>
-          <button className="h-7 w-7 flex items-center justify-center rounded hover:bg-gray-100 text-gray-400" title="复制"><Copy className="w-3.5 h-3.5" /></button>
-          <button className="h-7 w-7 flex items-center justify-center rounded hover:bg-gray-100 text-gray-400" title="粘贴"><ClipboardPaste className="w-3.5 h-3.5" /></button>
+          <button onClick={() => engineRef.current?.cut()} className="h-7 w-7 flex items-center justify-center rounded hover:bg-gray-100 text-gray-500" title="剪切 Ctrl+X"><Scissors className="w-3.5 h-3.5" /></button>
+          <button onClick={() => engineRef.current?.copy()} className="h-7 w-7 flex items-center justify-center rounded hover:bg-gray-100 text-gray-500" title="复制 Ctrl+C"><Copy className="w-3.5 h-3.5" /></button>
+          <button onClick={() => engineRef.current?.paste()} className="h-7 w-7 flex items-center justify-center rounded hover:bg-gray-100 text-gray-500" title="粘贴 Ctrl+V"><ClipboardPaste className="w-3.5 h-3.5" /></button>
           <button onClick={delSel} className="h-7 w-7 flex items-center justify-center rounded hover:bg-red-50 text-gray-500 hover:text-red-500" title="删除 Del"><Trash2 className="w-3.5 h-3.5" /></button>
         </div>
 
@@ -859,18 +862,21 @@ export default function EditorPage() {
           </button>
         </div>
 
-        <Separator orientation="vertical" className="h-6 mx-1" />
-
-        {/* Theme colors */}
-        <div className="flex items-center gap-0.5">
-          {Object.entries(MM_THEMES).map(([id, t]) => (
-            <button key={id} onClick={() => setTheme(id)}
-              className="h-5 w-5 rounded-full border-2 transition-all hover:scale-110"
-              style={{ backgroundColor: t.strokes[0], borderColor: eng?.theme === id ? "#374151" : "transparent" }}
-              title={t.nameZh}
-            />
-          ))}
-        </div>
+        {/* Theme colors — only show in mindmap mode */}
+        {eng?.mode === "mindmap" && (
+          <>
+            <Separator orientation="vertical" className="h-6 mx-1" />
+            <div className="flex items-center gap-0.5">
+              {Object.entries(MM_THEMES).map(([id, t]) => (
+                <button key={id} onClick={() => setTheme(id)}
+                  className="h-5 w-5 rounded-full border-2 transition-all hover:scale-110"
+                  style={{ backgroundColor: t.strokes[0], borderColor: eng?.theme === id ? "#374151" : "transparent" }}
+                  title={t.nameZh}
+                />
+              ))}
+            </div>
+          </>
+        )}
 
         <Separator orientation="vertical" className="h-6 mx-1" />
 

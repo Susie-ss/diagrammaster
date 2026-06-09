@@ -190,6 +190,7 @@ export class DiagramEngine {
   hover: string | null = null; linking: string | null = null; linkStyle = "orthogonal";
   theme = "sky"; snapping = true; gs = 20; showGrid = true;
   undos: any[] = []; redos: any[] = [];
+  clipboard: { nodes: DiagramNode[]; conns: DiagramConn[] } = { nodes: [], conns: [] };
   dragging = false; resizing = false; drawing = false; panning = false;
   ds: any = null; rh: string | null = null;
   editNode: DiagramNode | null = null; curPath: DiagramPath | null = null;
@@ -228,6 +229,58 @@ export class DiagramEngine {
   redo() { if (!this.redos.length) return; this.undos.push(this.snap()); this.apply(this.redos.pop()!); this.sel.clear(); this.render(); }
   snap() { return JSON.parse(JSON.stringify({ nodes: this.nodes, conns: this.conns, paths: this.paths })); }
   apply(p: any) { this.nodes = p.nodes; this.conns = p.conns; this.paths = p.paths; }
+
+  // Cut / Copy / Paste
+  copy() {
+    const selNodes = this.nodes.filter(n => this.sel.has(n.id));
+    if (!selNodes.length && !this.selConn) return;
+    this.clipboard = {
+      nodes: JSON.parse(JSON.stringify(selNodes)),
+      conns: this.selConn ? JSON.parse(JSON.stringify([this.selConn])) : []
+    };
+    this.onToast?.("已复制");
+  }
+  cut() {
+    if (!this.sel.size && !this.selConn) return;
+    this.pu();
+    this.copy();
+    // Delete selected
+    const selIds = new Set(this.sel);
+    this.nodes = this.nodes.filter(n => !selIds.has(n.id));
+    if (this.selConn) {
+      this.conns = this.conns.filter(c => c.id !== this.selConn!.id);
+    }
+    this.sel.clear(); this.selConn = null;
+    this.render();
+    this.onToast?.("已剪切");
+  }
+  paste() {
+    if (!this.clipboard.nodes.length && !this.clipboard.conns.length) return;
+    this.pu();
+    // Clone nodes with new IDs and offset position
+    const idMap = new Map<string, string>();
+    const newNodes: DiagramNode[] = [];
+    for (const n of this.clipboard.nodes) {
+      const newId = gid();
+      idMap.set(n.id, newId);
+      newNodes.push({ ...JSON.parse(JSON.stringify(n)), id: newId, x: n.x + 30, y: n.y + 30 });
+    }
+    // Clone conns with new IDs
+    const newConns: DiagramConn[] = [];
+    for (const c of this.clipboard.conns) {
+      const fromId = idMap.get(c.fromId) || c.fromId;
+      const toId = idMap.get(c.toId) || c.toId;
+      newConns.push({ ...JSON.parse(JSON.stringify(c)), id: gid(), fromId, toId });
+    }
+    this.nodes.push(...newNodes);
+    this.conns.push(...newConns);
+    // Select pasted nodes
+    this.sel.clear();
+    for (const n of newNodes) this.sel.add(n.id);
+    this.selConn = null;
+    this.render();
+    this.onToast?.("已粘贴");
+  }
 
   // Node helpers
   gn(id: string) { return this.nodes.find(n => n.id === id); }
@@ -726,15 +779,56 @@ export class DiagramEngine {
 
   // Export
   exportPNG() {
+    // Filter nodes by current mode
+    let nodes = this.nodes.filter(n => {
+      if (this.mode === "mindmap") return n.isMM;
+      if (this.mode === "freedraw") return n.isFD;
+      return !n.isMM && !n.isFD; // flowchart
+    });
+
+    // Calculate bounding box for filtered nodes + paths (freedraw)
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    for (const n of this.nodes) { minX = Math.min(minX, n.x); minY = Math.min(minY, n.y); maxX = Math.max(maxX, n.x + n.width); maxY = Math.max(maxY, n.y + n.height); }
+    for (const n of nodes) { minX = Math.min(minX, n.x); minY = Math.min(minY, n.y); maxX = Math.max(maxX, n.x + n.width); maxY = Math.max(maxY, n.y + n.height); }
+    if (this.mode === "freedraw") {
+      for (const p of this.paths) {
+        for (const pt of p.pts) { minX = Math.min(minX, pt.x); minY = Math.min(minY, pt.y); maxX = Math.max(maxX, pt.x); maxY = Math.max(maxY, pt.y); }
+      }
+    }
     if (!isFinite(minX)) { minX = 0; minY = 0; maxX = 800; maxY = 600; }
     const pad = 40, w2 = maxX - minX + pad * 2, h2 = maxY - minY + pad * 2;
     const off = document.createElement("canvas"); off.width = w2 * 2; off.height = h2 * 2;
     const oc = off.getContext("2d")!; oc.scale(2, 2);
     oc.fillStyle = "#fff"; oc.fillRect(0, 0, w2, h2);
     oc.save(); oc.translate(-minX + pad, -minY + pad);
-    for (const n of this.nodes) {
+
+    // Draw connections for current mode
+    if (this.mode === "flowchart") {
+      for (const c of this.conns) {
+        const f = nodes.find(n => n.id === c.fromId);
+        const t = nodes.find(n => n.id === c.toId);
+        if (!f || !t) continue;
+        oc.beginPath(); oc.moveTo(f.x + f.width / 2, f.y + f.height / 2);
+        oc.lineTo(t.x + t.width / 2, t.y + t.height / 2);
+        oc.strokeStyle = c.stroke || "#9ba5c0"; oc.lineWidth = c.sw || 1.5;
+        if (c.style === "dashed") oc.setLineDash([8, 5]); else oc.setLineDash([]);
+        oc.stroke(); oc.setLineDash([]);
+      }
+    }
+
+    // Draw mindmap connections
+    if (this.mode === "mindmap") {
+      for (const n of nodes) {
+        if (!n.parentId) continue;
+        const p = nodes.find(x => x.id === n.parentId);
+        if (!p) continue;
+        oc.beginPath(); oc.moveTo(p.x + p.width, p.y + p.height / 2);
+        oc.bezierCurveTo(p.x + p.width + 40, p.y + p.height / 2, n.x - 40, n.y + n.height / 2, n.x, n.y + n.height / 2);
+        oc.strokeStyle = "#9ba5c0"; oc.lineWidth = 1.5; oc.stroke();
+      }
+    }
+
+    // Draw nodes
+    for (const n of nodes) {
       if (n.fill && n.fill !== "transparent") oc.fillStyle = n.fill;
       const rx = n.cr != null ? n.cr : (n.type === "rounded-rect" ? 16 : 2);
       oc.beginPath(); rrP(oc, n.x, n.y, n.width, n.height, rx); oc.fill();
@@ -743,11 +837,23 @@ export class DiagramEngine {
       oc.fillStyle = n.fc || NODE_TEXT; oc.textAlign = "center"; oc.textBaseline = "middle";
       oc.fillText(n.text || "", n.x + n.width / 2, n.y + n.height / 2);
     }
+
+    // Draw freedraw paths
+    if (this.mode === "freedraw") {
+      for (const path of this.paths) {
+        if (!path.pts.length) continue;
+        oc.beginPath(); oc.moveTo(path.pts[0].x, path.pts[0].y);
+        for (let i = 1; i < path.pts.length; i++) oc.lineTo(path.pts[i].x, path.pts[i].y);
+        oc.strokeStyle = path.color || "#1e293b"; oc.lineWidth = path.width || 2; oc.lineCap = "round"; oc.lineJoin = "round"; oc.stroke();
+      }
+    }
+
     oc.restore();
+    const modeLabel = this.mode === "mindmap" ? "思维导图" : this.mode === "freedraw" ? "自由绘图" : "流程图";
     const a = document.createElement("a");
-    a.download = "diagram-" + new Date().toISOString().slice(0, 10) + ".png";
+    a.download = "diagram-" + modeLabel + "-" + new Date().toISOString().slice(0, 10) + ".png";
     a.href = off.toDataURL("image/png"); a.click();
-    this.onToast?.("PNG 已导出 (2x高清)");
+    this.onToast?.("PNG 已导出 (" + modeLabel + ", 2x高清)");
   }
   exportJSON() {
     const d = { version: "5.0", mode: this.mode, nodes: this.nodes, conns: this.conns, paths: this.paths, theme: this.theme };
