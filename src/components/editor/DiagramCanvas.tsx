@@ -7,7 +7,7 @@ export interface DiagramNode {
   id: string; type: string; x: number; y: number; width: number; height: number;
   fill: string; stroke: string; sw: number; ls: string; cr: number; opacity: number;
   text: string; fs: number; ff: string; fb: boolean; fi: boolean; fu: boolean; fc: string; ta: string;
-  parentId: string | null; collapsed: boolean; rot: number; isMM: boolean; isSw: boolean;
+  parentId: string | null; collapsed: boolean; rot: number; isMM: boolean; isSw: boolean; isFD: boolean;
 }
 
 export interface DiagramConn {
@@ -241,7 +241,8 @@ export class DiagramEngine {
       text: TEXT_DEFS[type] || "文本", fs: 13, ff: "PingFang SC",
       fb: type === "mindmap", fi: false, fu: false, fc: NODE_TEXT, ta: "center",
       parentId: pid || null, collapsed: false, rot: 0, isMM: type === "mindmap",
-      isSw: type.startsWith("swimlane")
+      isSw: type.startsWith("swimlane"),
+      isFD: false
     };
   }
 
@@ -313,16 +314,17 @@ export class DiagramEngine {
     ctx.translate(this.panX, this.panY);
     ctx.scale(this.zoom, this.zoom);
 
-    // Draw connections
-    this.drawConns();
+    // Draw connections — only in flowchart mode
+    if (this.mode === "flowchart") this.drawConns();
 
     // Mindmap parent→child curved connections
     if (this.mode === "mindmap") this.drawMMConns();
 
-    // Draw nodes
+    // Draw nodes — each mode renders only its own nodes
     for (const n of this.nodes) {
-      if (n.isMM && this.mode !== "mindmap") continue;
-      if (!n.isMM && this.mode === "mindmap") continue;
+      if (this.mode === "freedraw" && !n.isFD) continue;
+      if (this.mode === "mindmap" && !n.isMM) continue;
+      if (this.mode === "flowchart" && (n.isMM || n.isFD)) continue;
       this.drawNode(n);
     }
 
@@ -691,7 +693,8 @@ export class DiagramEngine {
       text: TEXT_DEFS[type] || "文本", fs: 13, ff: "PingFang SC",
       fb: false, fi: false, fu: false, fc: NODE_TEXT, ta: "center",
       parentId: null, collapsed: false, rot: 0, isMM: false,
-      isSw: type.startsWith("swimlane")
+      isSw: type.startsWith("swimlane"),
+      isFD: false
     };
   }
   mkConn(fromId: string, toId: string, style: string): DiagramConn {
@@ -808,7 +811,7 @@ export class DiagramEngine {
         fill: this.freeDrawFill ? (this.freeDrawColor + "18") : "transparent", stroke: this.freeDrawColor, sw: this.freeDrawWidth,
         ls: "solid", cr: 0, opacity: 100,
         text: "", fs: 13, ff: "PingFang SC", fb: false, fi: false, fu: false, fc: NODE_TEXT, ta: "center",
-        parentId: null, collapsed: false, rot: 0, isMM: false, isSw: false
+        parentId: null, collapsed: false, rot: 0, isMM: false, isSw: false, isFD: true
       };
       this.nodes.push(n);
     }
@@ -848,7 +851,7 @@ export class DiagramEngine {
       x: px, y: py, width: 140, height: 40,
       fill: "transparent", stroke: "transparent", sw: 0, ls: "solid", cr: 0, opacity: 100,
       text: text || "双击编辑", fs: 16, ff: "PingFang SC", fb: false, fi: false, fu: false, fc: this.freeDrawColor, ta: "left",
-      parentId: null, collapsed: false, rot: 0, isMM: false, isSw: false
+      parentId: null, collapsed: false, rot: 0, isMM: false, isSw: false, isFD: true
     };
     this.nodes.push(n);
     this.render();
