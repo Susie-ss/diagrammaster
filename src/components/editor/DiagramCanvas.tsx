@@ -348,10 +348,12 @@ export class DiagramEngine {
       }
     }
 
-    // Draw free draw paths
-    for (const path of this.paths) this.drawPath(path);
-    // Draw in-progress path
-    if (this.drawing && this.curPath) this.drawPath(this.curPath);
+    // Draw free draw paths — only in freedraw mode
+    if (this.mode === "freedraw") {
+      for (const path of this.paths) this.drawPath(path);
+      // Draw in-progress path
+      if (this.drawing && this.curPath) this.drawPath(this.curPath);
+    }
 
     // Marquee selection box
     if (this.marqueeActive && this.marqueeStart && this.marqueeEnd) {
@@ -365,8 +367,8 @@ export class DiagramEngine {
       ctx.beginPath(); ctx.rect(x, y, w, h); ctx.fill(); ctx.stroke();
     }
 
-    // Rectangle preview (freedraw sub-tool)
-    if (this.drawingRect && this.rectPreview) {
+    // Rectangle preview (freedraw sub-tool) — only in freedraw mode
+    if (this.mode === "freedraw" && this.drawingRect && this.rectPreview) {
       ctx.setLineDash([]);
       ctx.strokeStyle = this.freeDrawColor; ctx.lineWidth = this.freeDrawWidth;
       ctx.fillStyle = this.freeDrawFill ? (this.freeDrawColor + "18") : "transparent";
@@ -376,8 +378,8 @@ export class DiagramEngine {
       ctx.beginPath(); rrP(ctx, rp.x, rp.y, rp.w, rp.h, 0); ctx.fill(); ctx.stroke();
     }
 
-    // Line preview (freedraw sub-tool)
-    if (this.drawingLine && this.linePreview) {
+    // Line preview (freedraw sub-tool) — only in freedraw mode
+    if (this.mode === "freedraw" && this.drawingLine && this.linePreview) {
       ctx.setLineDash([6, 4]);
       ctx.strokeStyle = this.freeDrawColor; ctx.lineWidth = this.freeDrawWidth;
       ctx.lineCap = "round";
