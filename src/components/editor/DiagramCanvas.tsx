@@ -297,14 +297,18 @@ export class DiagramEngine {
     const dpr = window.devicePixelRatio || 1;
     const cw = this.canvas.width / dpr;
     const ch = this.canvas.height / dpr;
-    // Use setTransform (non-accumulating) to reset to DPR scale
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.clearRect(0, 0, cw, ch);
+
+    // Save original state so we can fully restore after rendering
     ctx.save();
+    ctx.scale(dpr, dpr);
+    ctx.clearRect(0, 0, cw, ch);
 
     // 背景填充白色
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, cw, ch);
+
+    // Save DPR-scaled base state for pan/zoom apply + restore later
+    ctx.save();
 
     // Grid — 主题色网格
     if (this.showGrid && this.zoom > 0.25) {
@@ -389,9 +393,11 @@ export class DiagramEngine {
       ctx.setLineDash([]);
       ctx.strokeStyle = "#ef4444"; ctx.lineWidth = 1;
       ctx.fillStyle = "rgba(239,68,68,0.1)";
-      // Position will be updated from page via move handler; show near last mouse position or center
     }
 
+    // Restore: undo pan+zoom → back to DPR-scaled base
+    ctx.restore();
+    // Restore: undo DPR scale → back to original clean state
     ctx.restore();
   }
 
