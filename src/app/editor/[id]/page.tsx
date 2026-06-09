@@ -753,9 +753,12 @@ export default function EditorPage() {
     <div className="h-screen flex flex-col bg-white text-gray-900 overflow-hidden">
       {/* ===== MENU BAR ===== */}
       <div className="h-9 bg-gray-50 border-b border-gray-200 flex items-center px-3 shrink-0 z-50">
-        <button onClick={() => router.push("/dashboard")} className="flex items-center gap-2 mr-6">
-          <Grid3X3 className="w-4 h-4 text-gray-700" />
-          <span className="font-medium text-sm text-gray-900">DiagramMaster</span>
+        <button onClick={() => router.push("/dashboard")} className="group flex items-center gap-2 mr-6">
+          <div className="relative w-4 h-4">
+            <Grid3X3 className="w-4 h-4 text-gray-500 absolute inset-0 transition-all duration-200 group-hover:opacity-0 group-hover:scale-75" />
+            <ArrowLeft className="w-4 h-4 text-gray-700 absolute inset-0 opacity-0 transition-all duration-200 group-hover:opacity-100 group-hover:scale-100 scale-75" />
+          </div>
+          <span className="font-medium text-sm text-gray-900 max-w-[220px] truncate">{project?.name || "DiagramMaster"}</span>
         </button>
 
         <div className="flex items-center gap-0.5 text-xs text-gray-700">
