@@ -297,8 +297,8 @@ export class DiagramEngine {
     const dpr = window.devicePixelRatio || 1;
     const cw = this.canvas.width / dpr;
     const ch = this.canvas.height / dpr;
-    ctx.save();
-    ctx.scale(dpr, dpr);
+    // Use setTransform (non-accumulating) to reset to DPR scale
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, cw, ch);
     ctx.save();
 
