@@ -549,7 +549,6 @@ export default function EditorPage() {
     }
 
     e.dragging = false; e.panning = false;
-    if (e.mode === "mindmap") e.layoutMM();
     refP(e); e.render();
   }, [refP]);
 
