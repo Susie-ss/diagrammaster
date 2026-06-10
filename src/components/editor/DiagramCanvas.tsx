@@ -766,12 +766,26 @@ export class DiagramEngine {
   layoutST(pid: string, sx: number, py: number) {
     const ch = this.gc(pid);
     if (!ch.length) return;
-    const gy = 44, cw2 = 120;
-    let y = py - (ch.length * 36 + (ch.length - 1) * gy) / 2 + 18;
+    const gap = 12, cw2 = 120;
+    // 按每个分支的实际子树高度分配垂直空间，避免兄弟子树重叠
+    const hts: number[] = [];
+    let totalH = 0;
     for (const c of ch) {
-      c.x = sx; c.y = y; c.width = cw2; c.height = 36;
-      if (!c.collapsed && this.gc(c.id).length) this.layoutST(c.id, sx + 150, y + 18);
-      y += 36 + gy;
+      const h = c.collapsed ? 50 : Math.max(50, this.stH(c.id));
+      hts.push(h);
+      totalH += h;
+    }
+    totalH += (ch.length - 1) * gap;
+    // 以 py 为中心垂直分布整个 block
+    let y = py - totalH / 2;
+    for (let i = 0; i < ch.length; i++) {
+      const c = ch[i];
+      const h = hts[i];
+      // 36px 节点在其分配的子树空间中垂直居中
+      c.x = sx; c.y = y + (h - 36) / 2;
+      c.width = cw2; c.height = 36;
+      if (!c.collapsed && this.gc(c.id).length) this.layoutST(c.id, sx + 150, y + (h - 36) / 2 + 18);
+      y += h + gap;
     }
   }
   mkMMRoot(x: number, y: number) {
