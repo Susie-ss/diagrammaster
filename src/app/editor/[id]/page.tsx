@@ -807,7 +807,7 @@ export default function EditorPage() {
       { label: "放大", action: handleZoomIn, kd: "Ctrl+=" },
       { label: "缩小", action: handleZoomOut, kd: "Ctrl+-" },
       { label: "适应画布", action: handleFit },
-      { label: "100%", action: () => { const e = engineRef.current; if (e) { e.zoom = 1; e.panX = 0; e.panY = 0; e.render(); setEngineVersion(v => v + 1); } } },
+      { label: "100%", action: () => { const e = engineRef.current; if (e && wrapRef.current) { e.centerAtZoom(1, wrapRef.current.clientWidth, wrapRef.current.clientHeight); e.render(); setEngineVersion(v => v + 1); } } },
     ],
     帮助: [
       { label: "快捷键", action: () => toast("Ctrl+S 保存 · Ctrl+Z 撤销 · Ctrl+Y 重做 · Del 删除 · 滚轮缩放") },
@@ -1003,7 +1003,7 @@ export default function EditorPage() {
           <Separator orientation="vertical" className="h-5 mx-1" />
           <div className="flex items-center gap-0.5 border border-gray-200 rounded px-1.5 py-0.5">
             <button onClick={handleZoomOut} className="h-5 w-5 flex items-center justify-center rounded hover:bg-gray-100 text-gray-500"><ZoomOut className="w-3 h-3" /></button>
-            <span className="text-xs font-medium min-w-[2.5rem] text-center cursor-pointer" onClick={() => { if (eng) { eng.zoom = 1; eng.panX = 0; eng.panY = 0; eng.render(); setEngineVersion(v => v + 1); } }}>
+            <span className="text-xs font-medium min-w-[2.5rem] text-center cursor-pointer" onClick={() => { const e = engineRef.current; if (e && wrapRef.current) { e.centerAtZoom(1, wrapRef.current.clientWidth, wrapRef.current.clientHeight); e.render(); setEngineVersion(v => v + 1); } }}>
               {eng ? Math.round(eng.zoom * 100) + "%" : "100%"}
             </span>
             <button onClick={handleZoomIn} className="h-5 w-5 flex items-center justify-center rounded hover:bg-gray-100 text-gray-500"><ZoomIn className="w-3 h-3" /></button>

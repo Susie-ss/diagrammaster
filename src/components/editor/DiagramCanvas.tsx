@@ -1157,6 +1157,54 @@ export class DiagramEngine {
 
     return true;
   }
+
+  // Center content at a specific zoom level (pan only, no zoom change)
+  centerAtZoom(targetZoom: number, canvasWidth: number, canvasHeight: number): boolean {
+    if (canvasWidth <= 0 || canvasHeight <= 0) return false;
+
+    const nodes = this.nodes.filter(n => {
+      if (this.mode === "mindmap") return n.isMM;
+      if (this.mode === "freedraw") return n.isFD;
+      return !n.isMM && !n.isFD;
+    });
+
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    let hasContent = false;
+
+    for (const n of nodes) {
+      hasContent = true;
+      minX = Math.min(minX, n.x);
+      minY = Math.min(minY, n.y);
+      maxX = Math.max(maxX, n.x + n.width);
+      maxY = Math.max(maxY, n.y + n.height);
+    }
+
+    if (this.mode === "freedraw") {
+      for (const p of this.paths) {
+        for (const pt of p.pts) {
+          hasContent = true;
+          minX = Math.min(minX, pt.x);
+          minY = Math.min(minY, pt.y);
+          maxX = Math.max(maxX, pt.x);
+          maxY = Math.max(maxY, pt.y);
+        }
+      }
+    }
+
+    if (!hasContent) {
+      this.panX = canvasWidth / 2;
+      this.panY = canvasHeight / 2;
+      this.zoom = targetZoom;
+      return false;
+    }
+
+    this.zoom = targetZoom;
+    const contentCX = (minX + maxX) / 2;
+    const contentCY = (minY + maxY) / 2;
+    this.panX = canvasWidth / 2 - contentCX * this.zoom;
+    this.panY = canvasHeight / 2 - contentCY * this.zoom;
+    return true;
+  }
 }
 
 export { PALETTE, MM_THEMES, DIMS, DEFS, toCv };
