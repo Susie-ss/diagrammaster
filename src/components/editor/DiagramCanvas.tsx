@@ -728,7 +728,7 @@ export class DiagramEngine {
     const roots = this.nodes.filter(n => n.isMM && !n.parentId);
     if (!roots.length) return;
     let sy = 120;
-    for (const r of roots) { r.x = 200; r.y = sy; this.layoutST(r.id, r.x + 160, r.y); sy += Math.max(this.stH(r.id), 150) + 80; }
+    for (const r of roots) { r.x = 200; r.y = sy; this.layoutST(r.id, r.x + 160, r.y + r.height / 2); sy += Math.max(this.stH(r.id), 150) + 80; }
   }
   layoutST(pid: string, sx: number, py: number) {
     const ch = this.gc(pid);
