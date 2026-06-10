@@ -1098,6 +1098,65 @@ export class DiagramEngine {
   setSpaceDown(down: boolean) {
     this.spaceDown = down;
   }
+
+  // Auto-fit: adjust zoom + pan to center content on canvas
+  // Returns true if content was found and fit was applied
+  autoFit(canvasWidth: number, canvasHeight: number): boolean {
+    if (canvasWidth <= 0 || canvasHeight <= 0) return false;
+
+    // Get nodes for current mode
+    const nodes = this.nodes.filter(n => {
+      if (this.mode === "mindmap") return n.isMM;
+      if (this.mode === "freedraw") return n.isFD;
+      return !n.isMM && !n.isFD;
+    });
+
+    // Include paths for freedraw mode
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    let hasContent = false;
+
+    for (const n of nodes) {
+      hasContent = true;
+      minX = Math.min(minX, n.x);
+      minY = Math.min(minY, n.y);
+      maxX = Math.max(maxX, n.x + n.width);
+      maxY = Math.max(maxY, n.y + n.height);
+    }
+
+    if (this.mode === "freedraw") {
+      for (const p of this.paths) {
+        for (const pt of p.pts) {
+          hasContent = true;
+          minX = Math.min(minX, pt.x);
+          minY = Math.min(minY, pt.y);
+          maxX = Math.max(maxX, pt.x);
+          maxY = Math.max(maxY, pt.y);
+        }
+      }
+    }
+
+    if (!hasContent) {
+      // No content: center the origin point
+      this.panX = canvasWidth / 2;
+      this.panY = canvasHeight / 2;
+      this.zoom = 1;
+      return false;
+    }
+
+    const pad = 60;
+    const contentW = maxX - minX + pad * 2;
+    const contentH = maxY - minY + pad * 2;
+    const newZoom = Math.min(canvasWidth / contentW, canvasHeight / contentH, 1.5);
+    this.zoom = Math.max(0.1, newZoom);
+
+    // Center: after applying zoom + pan, content center should = canvas center
+    const contentCX = (minX + maxX) / 2;
+    const contentCY = (minY + maxY) / 2;
+    this.panX = canvasWidth / 2 - contentCX * this.zoom;
+    this.panY = canvasHeight / 2 - contentCY * this.zoom;
+
+    return true;
+  }
 }
 
 export { PALETTE, MM_THEMES, DIMS, DEFS, toCv };

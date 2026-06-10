@@ -186,6 +186,10 @@ export default function EditorPage() {
       } else if (eng.mode === "mindmap") {
         eng.layoutMM();
       }
+
+      // Auto-fit: center content on canvas
+      eng.autoFit(wrap.clientWidth, wrap.clientHeight);
+
       eng.render();
     } catch {
       toast("加载失败，请刷新重试");
@@ -289,6 +293,12 @@ export default function EditorPage() {
       if (!eng.nodes.filter(n => n.isMM).length) eng.initMM();
       else { eng.layoutMM(); eng.applyMMTheme(); }
     }
+
+    // Auto-fit on first entry to a mode (no saved state)
+    if (!saved && wrapRef.current) {
+      eng.autoFit(wrapRef.current.clientWidth, wrapRef.current.clientHeight);
+    }
+
     eng.render();
     refP(eng);
     setEngineVersion(v => v + 1);
@@ -300,16 +310,11 @@ export default function EditorPage() {
   const handleZoomIn = () => { const e = engineRef.current; if (e) { e.zoom = Math.min(3, e.zoom * 1.15); e.render(); setEngineVersion(v => v + 1); } };
   const handleZoomOut = () => { const e = engineRef.current; if (e) { e.zoom = Math.max(0.1, e.zoom / 1.15); e.render(); setEngineVersion(v => v + 1); } };
   const handleFit = () => {
-    const e = engineRef.current; if (!e || !wrapRef.current) return;
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    for (const n of e.nodes) { minX = Math.min(minX, n.x); minY = Math.min(minY, n.y); maxX = Math.max(maxX, n.x + n.width); maxY = Math.max(maxY, n.y + n.height); }
-    if (!isFinite(minX)) return;
-    const wr = wrapRef.current.getBoundingClientRect();
-    const cw2 = maxX - minX + 120, ch2 = maxY - minY + 120;
-    e.zoom = Math.min(wr.width / cw2, wr.height / ch2, 1.5);
-    e.panX = (wr.width - cw2 * e.zoom) / 2 - minX * e.zoom + 60 * e.zoom;
-    e.panY = (wr.height - ch2 * e.zoom) / 2 - minY * e.zoom + 60 * e.zoom;
+    const e = engineRef.current;
+    if (!e || !wrapRef.current) return;
+    e.autoFit(wrapRef.current.clientWidth, wrapRef.current.clientHeight);
     e.render();
+    setEngineVersion(v => v + 1);
   };
   const toggleGrid = () => { const e = engineRef.current; if (e) { e.showGrid = !e.showGrid; e.render(); } };
   const toggleSnap = () => { const e = engineRef.current; if (e) { e.snapping = !e.snapping; } };
