@@ -418,6 +418,10 @@ export default function EditorPage() {
           } else if (!e.sel.has(hn.id)) {
             e.selN(hn.id);
           }
+          // 记录点击起点：若当前节点已在多选中且多选 > 1，点击（非拖拽）时应收敛为单选
+          if (e.sel.has(hn.id) && e.sel.size > 1) {
+            e.clickStartX = ev.clientX; e.clickStartY = ev.clientY; e.clickStartNodeId = hn.id;
+          }
           e.dragging = true;
           e.ds = {
             x: ev.clientX, y: ev.clientY,
@@ -456,6 +460,10 @@ export default function EditorPage() {
         else e.sel.add(hn.id);
       } else if (!e.sel.has(hn.id)) {
         e.selN(hn.id);
+      }
+      // 记录点击起点：若当前节点已在多选中且多选 > 1，点击（非拖拽）时应收敛为单选
+      if (e.sel.has(hn.id) && e.sel.size > 1) {
+        e.clickStartX = ev.clientX; e.clickStartY = ev.clientY; e.clickStartNodeId = hn.id;
       }
       e.dragging = true;
       e.ds = {
@@ -567,6 +575,12 @@ export default function EditorPage() {
     }
 
     e.dragging = false; e.panning = false;
+    // 纯点击（无拖拽）多选节点时，收敛为只选中被点击的单个节点
+    if (e.clickStartNodeId && e.sel.size > 1) {
+      const dist = Math.hypot(ev.clientX - e.clickStartX, ev.clientY - e.clickStartY);
+      if (dist < 3) e.selN(e.clickStartNodeId);
+    }
+    e.clickStartNodeId = null; e.clickStartX = 0; e.clickStartY = 0;
     refP(e); e.render();
   }, [refP]);
 

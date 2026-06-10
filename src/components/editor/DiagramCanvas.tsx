@@ -197,6 +197,8 @@ export class DiagramEngine {
   spaceDown = false;
   marqueeMode = "partial"; marqueeActive = false; marqueeStart: {x:number;y:number} | null = null; marqueeEnd: {x:number;y:number} | null = null;
   fmtBrush: any = null; fmtBrushOn = false;
+  // Click-to-single-select: when clicking (not dragging) on a multi-selected node, reduce selection to just that node
+  clickStartX = 0; clickStartY = 0; clickStartNodeId: string | null = null;
   // Free draw
   freeDrawSubTool = "pencil"; freeDrawTool = "pen"; freeDrawColor = "#1e293b"; freeDrawWidth = 2; freeDrawEraser = false; freeDrawFill = false; eraserSize = 24;
   drawingRect = false; drawingLine = false;
