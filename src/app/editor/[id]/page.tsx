@@ -149,50 +149,68 @@ export default function EditorPage() {
     const canvas = canvasRef.current;
     if (!wrap || !canvas || !projectId) return;
 
+    // Step 1: Create engine early so engineRef.current prevents duplicate inits
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = wrap.clientWidth * dpr;
+    canvas.height = wrap.clientHeight * dpr;
+    canvas.style.width = wrap.clientWidth + "px";
+    canvas.style.height = wrap.clientHeight + "px";
+
+    const eng = new DiagramEngine();
+    eng.canvas = canvas;
+    eng.ctx = canvas.getContext("2d")!;
+    eng.onToast = toast;
+    eng.wrapEl = wrap;
+    engineRef.current = eng;
+    setEngineVersion(v => v + 1);
+
+    // Step 2: Fetch project data (network errors are the only "load failed" case)
+    let proj: any = null;
     try {
       const res = await fetch(`/api/projects/${projectId}`);
       if (!res.ok) {
         router.push("/dashboard");
         return;
       }
-      const proj = await res.json();
+      proj = await res.json();
       setProject(proj);
       document.title = proj.name + " - DiagramMaster";
+    } catch {
+      toast("加载失败，请刷新重试");
+      return;
+    }
 
-      const dpr = window.devicePixelRatio || 1;
-      canvas.width = wrap.clientWidth * dpr;
-      canvas.height = wrap.clientHeight * dpr;
-      canvas.style.width = wrap.clientWidth + "px";
-      canvas.style.height = wrap.clientHeight + "px";
-
-      const eng = new DiagramEngine();
-      eng.canvas = canvas;
-      eng.ctx = canvas.getContext("2d")!;
-      eng.onToast = toast;
-      eng.wrapEl = wrap;  // 统一坐标系：hitN 使用 wrap rect，与页面 mouse handler 一致
-      engineRef.current = eng;
-
-      // Trigger re-render so toolbar picks up engine ref
-      setEngineVersion(v => v + 1);
-
-      // Load data
-      if (proj.diagram_data && proj.diagram_data.nodes) {
+    // Step 3: Load data + render (isolated try so engine stays alive)
+    try {
+      if (proj?.diagram_data?.nodes) {
         eng.load(proj.diagram_data);
       }
 
-      // Init defaults
       if (eng.nodes.length === 0) {
         if (eng.mode === "mindmap") eng.initMM();
       } else if (eng.mode === "mindmap") {
         eng.layoutMM();
       }
 
-      // Auto-fit: center content on canvas
       eng.autoFit(wrap.clientWidth, wrap.clientHeight);
-
       eng.render();
-    } catch {
-      toast("加载失败，请刷新重试");
+    } catch (innerErr) {
+      console.error("Diagram init/render error:", innerErr);
+      // Fallback: reset to empty state and re-init
+      eng.nodes = [];
+      eng.conns = [];
+      eng.paths = [];
+      eng.sel.clear();
+      eng.selConn = null;
+      try {
+        eng.initMM();
+        eng.autoFit(wrap.clientWidth, wrap.clientHeight);
+        eng.render();
+        toast("部分数据无法加载，已为您重建画布");
+      } catch {
+        // Final fallback: fail silently, user sees blank canvas
+        eng.render();
+      }
     }
   }, [projectId, router, toast]);
 
