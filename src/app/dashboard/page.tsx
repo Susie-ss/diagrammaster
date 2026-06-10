@@ -264,7 +264,7 @@ export default function DashboardPage() {
             {filteredFolders.map(f => (
               <button
                 key={f.id}
-                onClick={() => { setSelectedFolder(f.id); setContextMenu(null); }}
+                onClick={() => { setSelectedFolder(f.id); setContextMenu(null); setShowNewFolder(false); }}
                 onContextMenu={(e) => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY, type: "folder", id: f.id }); }}
                 className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors text-left ${selectedFolder === f.id ? "bg-indigo-50 text-indigo-500" : "text-gray-700 hover:bg-gray-100"}`}
               >
@@ -272,6 +272,23 @@ export default function DashboardPage() {
                 <span className="truncate">{f.name}</span>
               </button>
             ))}
+            {showNewFolder && (
+              <div className="flex items-center gap-1 px-2 py-1">
+                <Folder className="w-4 h-4 shrink-0 text-gray-400 ml-1" />
+                <input
+                  autoFocus
+                  value={newFolderName}
+                  onChange={(e) => setNewFolderName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") createFolder();
+                    if (e.key === "Escape") { setShowNewFolder(false); setNewFolderName(""); }
+                  }}
+                  placeholder="文件夹名称"
+                  onBlur={() => { if (!newFolderName.trim()) setShowNewFolder(false); }}
+                  className="flex-1 h-7 bg-white border border-gray-300 rounded-md px-2 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+                />
+              </div>
+            )}
           </div>
 
           <div className="p-4 border-t border-gray-200">
@@ -296,21 +313,6 @@ export default function DashboardPage() {
                 </span>
               ))}
               <button onClick={() => deleteFolder(selectedFolder)} className="ml-auto text-red-500 hover:text-red-600 text-xs p-1">删除此文件夹</button>
-            </div>
-          )}
-
-          {showNewFolder && (
-            <div className="px-6 py-3 border-b border-gray-200 flex items-center gap-2">
-              <input
-                autoFocus
-                value={newFolderName}
-                onChange={(e) => setNewFolderName(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") createFolder(); if (e.key === "Escape") setShowNewFolder(false); }}
-                placeholder="文件夹名称"
-                className="h-9 bg-white border border-gray-300 rounded-lg px-3 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 w-48"
-              />
-              <button onClick={createFolder} className="h-9 px-3 bg-indigo-500 rounded-lg text-sm">创建</button>
-              <button onClick={() => setShowNewFolder(false)} className="h-9 px-3 text-sm text-gray-500">取消</button>
             </div>
           )}
 
