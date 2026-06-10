@@ -329,18 +329,13 @@ export default function EditorPage() {
   }, []);
 
   // Delete selection
-  const delSel = () => {
+  const delSel = useCallback(() => {
     const e = engineRef.current; if (!e) return;
-    if (!e.sel.size && !e.selConn) return;
-    e.pu();
-    if (e.selConn) { e.conns = e.conns.filter(c => c.id !== e.selConn!.id); e.selConn = null; }
-    const delST = (pid: string) => { for (const ch of e.gc(pid)) delST(ch.id); e.nodes = e.nodes.filter(n => n.id !== pid && n.parentId !== pid); };
-    for (const id of e.sel) delST(id);
-    e.conns = e.conns.filter(c => !e.sel.has(c.fromId) && !e.sel.has(c.toId));
-    e.sel.clear();
-    if (e.mode === "mindmap") e.layoutMM();
-    e.render(); refP(e); toast("已删除");
-  };
+    if (e.deleteSelected()) {
+      refP(e);
+      toast("已删除");
+    }
+  }, [refP, toast]);
 
   // Add shape
   const addShape = useCallback((type: string) => {
@@ -653,19 +648,6 @@ export default function EditorPage() {
     refP(e); e.render();
   }, [refP]);
 
-  const handleWheel = useCallback((ev: React.WheelEvent) => {
-    const e = engineRef.current; if (!e || !wrapRef.current) return;
-    ev.preventDefault();
-    const zf = ev.deltaY < 0 ? 1.08 : 1 / 1.08;
-    const nz = e.zoom * zf;
-    if (nz < 0.1 || nz > 3) return;
-    const r = wrapRef.current.getBoundingClientRect();
-    const mx = ev.clientX - r.left, my = ev.clientY - r.top;
-    e.panX = mx - (mx - e.panX) * (nz / e.zoom);
-    e.panY = my - (my - e.panY) * (nz / e.zoom);
-    e.zoom = nz; e.render(); setEngineVersion(v => v + 1);
-  }, []);
-
   const handleDblClick = useCallback((ev: React.MouseEvent) => {
     const e = engineRef.current; if (!e) return;
     const hn = e.hitN(ev.clientX, ev.clientY);
@@ -777,7 +759,7 @@ export default function EditorPage() {
     window.addEventListener("keydown", onKey);
     window.addEventListener("keyup", onKeyUp);
     return () => { window.removeEventListener("keydown", onKey); window.removeEventListener("keyup", onKeyUp); };
-  }, [save, handleUndo, handleRedo]);
+  }, [save, handleUndo, handleRedo, delSel]);
 
   // Menu items
   type MenuItem = { label: string; action?: () => void; kd?: string; sep?: never } | { sep: true; label?: never; action?: never; kd?: never };
@@ -1299,7 +1281,6 @@ export default function EditorPage() {
             onMouseDown={handleCanvasMouseDown}
             onMouseMove={handleCanvasMouseMove}
             onMouseUp={handleCanvasMouseUp}
-            onWheel={handleWheel}
             onDoubleClick={handleDblClick}
             onContextMenu={(e) => e.preventDefault()}
             style={{ cursor: eng?.panning ? "grabbing" : eng?.spaceDown ? "grab" : (eng?.mode === "freedraw" && eng?.freeDrawEraser ? "crosshair" : (eng?.mode === "freedraw" && eng?.freeDrawSubTool === "text" ? "text" : (eng?.mode === "freedraw" ? "crosshair" : eng?.linking ? "crosshair" : "default"))) }}

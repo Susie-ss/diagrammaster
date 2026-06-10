@@ -233,6 +233,39 @@ export class DiagramEngine {
   snap() { return JSON.parse(JSON.stringify({ nodes: this.nodes, conns: this.conns, paths: this.paths })); }
   apply(p: any) { this.nodes = p.nodes; this.conns = p.conns; this.paths = p.paths; }
 
+  // Delete selected nodes + connections
+  deleteSelected(): boolean {
+    if (!this.sel.size && !this.selConn) return false;
+    this.pu();
+
+    // Collect all IDs to delete (including children recursively)
+    const toDelete = new Set<string>();
+    const collect = (pid: string) => {
+      toDelete.add(pid);
+      for (const ch of this.gc(pid)) collect(ch.id);
+    };
+    for (const id of this.sel) collect(id);
+
+    // Remove nodes
+    this.nodes = this.nodes.filter(n => !toDelete.has(n.id));
+
+    // Remove connections
+    if (this.selConn) {
+      this.conns = this.conns.filter(c => c.id !== this.selConn!.id);
+      this.selConn = null;
+    }
+    this.conns = this.conns.filter(c => !toDelete.has(c.fromId) && !toDelete.has(c.toId));
+
+    // Clear selection
+    this.sel.clear();
+
+    // Re-layout mindmap
+    if (this.mode === "mindmap") this.layoutMM();
+
+    this.render();
+    return true;
+  }
+
   // Cut / Copy / Paste
   copy() {
     const selNodes = this.nodes.filter(n => this.sel.has(n.id));
