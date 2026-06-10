@@ -188,6 +188,7 @@ export class DiagramEngine {
   modeStates: Record<string, { panX: number; panY: number; zoom: number }> = {};
   sel = new Set<string>(); selConn: DiagramConn | null = null;
   hover: string | null = null; linking: string | null = null; linkStyle = "orthogonal";
+  linkMouseX = 0; linkMouseY = 0;
   theme = "sky"; snapping = true; gs = 20; showGrid = true;
   undos: any[] = []; redos: any[] = [];
   clipboard: { nodes: DiagramNode[]; conns: DiagramConn[] } = { nodes: [], conns: [] };
@@ -350,6 +351,39 @@ export class DiagramEngine {
     return b;
   }
 
+  // Connection line hit testing
+  hitConn(mx: number, my: number): DiagramConn | null {
+    const el = this.wrapEl || this.canvas!;
+    const p = toCv(mx, my, el, this.zoom, this.panX, this.panY);
+    for (const c of this.conns) {
+      const f = this.gn(c.fromId), t = this.gn(c.toId);
+      if (!f || !t) continue;
+      const fp = this.clCPt(f, t.x + t.width / 2, t.y + t.height / 2);
+      const tp = this.clCPt(t, fp.x, fp.y);
+      if (this.distToSeg(p.x, p.y, fp.x, fp.y, tp.x, tp.y) < 10) return c;
+    }
+    return null;
+  }
+  private distToSeg(px: number, py: number, x1: number, y1: number, x2: number, y2: number): number {
+    const dx = x2 - x1, dy = y2 - y1;
+    const lenSq = dx * dx + dy * dy;
+    if (lenSq === 0) return Math.hypot(px - x1, py - y1);
+    let t = ((px - x1) * dx + (py - y1) * dy) / lenSq;
+    t = Math.max(0, Math.min(1, t));
+    return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
+  }
+
+  // Check if mouse is near a connection point anchor (for starting link)
+  hitAnchor(n: DiagramNode, mx: number, my: number): string | null {
+    const el = this.wrapEl || this.canvas!;
+    const p = toCv(mx, my, el, this.zoom, this.panX, this.panY);
+    const pts = this.cpPts(n);
+    for (const pt of pts) {
+      if (Math.hypot(pt.x - p.x, pt.y - p.y) < 10) return pt.p;
+    }
+    return null;
+  }
+
   // ======================== RENDERING ========================
   render() {
     if (!this.canvas || !this.ctx) return;
@@ -402,9 +436,23 @@ export class DiagramEngine {
     if (this.linking && this.mode === "flowchart") {
       const fn = this.gn(this.linking);
       if (fn) {
-        ctx.strokeStyle = "#6366f1"; ctx.lineWidth = 1.5; ctx.setLineDash([6, 4]); ctx.beginPath();
-        ctx.moveTo(fn.x + fn.width / 2, fn.y);
+        const sp = this.clCPt(fn, this.linkMouseX || fn.x + fn.width, this.linkMouseY || fn.y);
+        ctx.strokeStyle = "#6366f1"; ctx.lineWidth = 2; ctx.setLineDash([6, 4]); ctx.beginPath();
+        ctx.moveTo(sp.x, sp.y);
+        if (this.linkStyle === "curved") {
+          const dx = this.linkMouseX - sp.x, dy = this.linkMouseY - sp.y;
+          ctx.bezierCurveTo(sp.x + dx * 0.4, sp.y, this.linkMouseX - dx * 0.4, this.linkMouseY, this.linkMouseX, this.linkMouseY);
+        } else if (this.linkStyle === "straight") {
+          ctx.lineTo(this.linkMouseX, this.linkMouseY);
+        } else {
+          // orthogonal: 折线
+          const mx = (sp.x + this.linkMouseX) / 2;
+          ctx.lineTo(mx, sp.y); ctx.lineTo(mx, this.linkMouseY); ctx.lineTo(this.linkMouseX, this.linkMouseY);
+        }
         ctx.stroke(); ctx.setLineDash([]);
+        // 目标端点小圆
+        ctx.beginPath(); ctx.arc(this.linkMouseX, this.linkMouseY, 4.5, 0, Math.PI * 2);
+        ctx.fillStyle = "#6366f1"; ctx.fill();
       }
     }
 
@@ -489,9 +537,10 @@ export class DiagramEngine {
       const fp = this.clCPt(f, t.x + t.width / 2, t.y + t.height / 2);
       const tp = this.clCPt(t, fp.x, fp.y);
 
-      const strokeColor = c.stroke || CONN_STROKE;
+      const isSelected = this.selConn?.id === c.id;
+      const strokeColor = isSelected ? "#6366f1" : (c.stroke || CONN_STROKE);
       ctx.strokeStyle = strokeColor;
-      ctx.lineWidth = c.sw || 1.5;
+      ctx.lineWidth = isSelected ? (c.sw || 1.5) + 2 : (c.sw || 1.5);
 
       // 虚线样式
       if (c.ls === "dashed") {
@@ -648,6 +697,20 @@ export class DiagramEngine {
         { x: cx, y }, { x: cx, y: y + h }, { x, y: cy }, { x: x + w, y: cy }
       ];
       for (const hh of hs) { ctx.beginPath(); ctx.rect(hh.x - 4, hh.y - 4, 8, 8); ctx.fill(); ctx.stroke(); }
+
+      // Flowchart connection anchors: 4 direction points
+      if (this.mode === "flowchart" && !n.isMM && !n.isFD) {
+        const pts = this.cpPts(n);
+        for (const pt of pts) {
+          ctx.beginPath();
+          ctx.arc(pt.x, pt.y, 5, 0, Math.PI * 2);
+          ctx.fillStyle = "#ffffff";
+          ctx.fill();
+          ctx.strokeStyle = "#6366f1";
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+        }
+      }
     }
 
     ctx.restore();
@@ -1037,4 +1100,4 @@ export class DiagramEngine {
   }
 }
 
-export { PALETTE, MM_THEMES, DIMS, DEFS };
+export { PALETTE, MM_THEMES, DIMS, DEFS, toCv };

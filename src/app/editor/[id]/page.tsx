@@ -3,7 +3,7 @@
 import { useRef, useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/components/ui/AuthProvider";
-import { DiagramEngine, PALETTE, DIMS, DEFS, MM_THEMES } from "@/components/editor/DiagramCanvas";
+import { DiagramEngine, PALETTE, DIMS, DEFS, MM_THEMES, toCv } from "@/components/editor/DiagramCanvas";
 import type { DiagramNode, DiagramConn } from "@/components/editor/DiagramCanvas";
 import {
   ArrowLeft, Save, Undo2, Redo2, ZoomIn, ZoomOut, Maximize,
@@ -77,6 +77,9 @@ export default function EditorPage() {
   const [fdEraser, setFDEraser] = useState(false);
   const [fdEraserSize, setFDEraserSize] = useState(24);
   const [fdMousePos, setFDMousePos] = useState<{x:number;y:number}|null>(null);
+
+  // Link style
+  const [linkStyle, setLinkStyle] = useState("orthogonal");
 
   // Toast
   const toast = useCallback((msg: string) => {
@@ -240,6 +243,12 @@ export default function EditorPage() {
     e.eraserSize = fdEraserSize;
   }, [fdSubTool, fdTool, fdColor, fdWidth, fdFill, fdEraser, fdEraserSize]);
 
+  // Sync link style to engine
+  useEffect(() => {
+    const e = engineRef.current; if (!e) return;
+    e.linkStyle = linkStyle;
+  }, [linkStyle]);
+
   // Resize & ResizeObserver
   useEffect(() => {
     const wrap = wrapRef.current;
@@ -329,13 +338,16 @@ export default function EditorPage() {
   };
 
   // Add shape
-  const addShape = (type: string) => {
+  const addShape = useCallback((type: string) => {
     const e = engineRef.current; if (!e || e.mode !== "flowchart") return;
+    // 防御性清理：取消所有可能干扰的状态
+    e.linking = null; e.sel.clear(); e.selConn = null;
+    e.clickStartNodeId = null; e.clickStartX = 0; e.clickStartY = 0;
     e.pu();
     const n = e.crFlowNode(type, 300 + Math.random() * 100, 200 + Math.random() * 100);
     e.nodes.push(n); e.selN(n.id);
     e.render(); refP(e); toast("已添加: " + n.text);
-  };
+  }, [refP, toast]);
 
   // Mouse handlers
   const handleCanvasMouseDown = useCallback((ev: React.MouseEvent) => {
@@ -443,7 +455,28 @@ export default function EditorPage() {
 
     // Hit test for node/conn
     const hn = e.hitN(ev.clientX, ev.clientY);
+
+    // Flowchart mode: connection line hit test
+    if (e.mode === "flowchart" && !hn && !e.linking) {
+      const hc = e.hitConn(ev.clientX, ev.clientY);
+      if (hc) {
+        e.sel.clear(); e.selConn = hc; refP(e); e.render(); return;
+      }
+    }
+
     if (hn) {
+      // Flowchart mode: check for anchor hit to start linking
+      if (e.mode === "flowchart" && !e.linking && !(ev.shiftKey || ev.metaKey)) {
+        const anchor = e.hitAnchor(hn, ev.clientX, ev.clientY);
+        if (anchor) {
+          e.linking = hn.id;
+          const p = toCv(ev.clientX, ev.clientY, wrapRef.current!, e.zoom, e.panX, e.panY);
+          e.linkMouseX = p.x; e.linkMouseY = p.y;
+          e.sel.clear(); e.selConn = null;
+          refP(e); e.render(); return;
+        }
+      }
+
       // Linking
       if (e.linking && e.mode === "flowchart" && hn.id !== e.linking) {
         e.pu();
@@ -474,6 +507,12 @@ export default function EditorPage() {
       refP(e);
       e.render();
     } else {
+      // Click on empty space while linking → cancel linking
+      if (e.linking) {
+        e.linking = null;
+        e.render();
+        return;
+      }
       // Empty area → start marquee
       if (!(ev.shiftKey || ev.metaKey)) {
         e.sel.clear(); e.selConn = null;
@@ -485,6 +524,17 @@ export default function EditorPage() {
 
   const handleCanvasMouseMove = useCallback((ev: React.MouseEvent) => {
     const e = engineRef.current; if (!e) return;
+
+    // Linking preview
+    if (e.linking && e.mode === "flowchart") {
+      const r2 = wrapRef.current?.getBoundingClientRect();
+      if (r2) {
+        e.linkMouseX = (ev.clientX - r2.left - e.panX) / e.zoom;
+        e.linkMouseY = (ev.clientY - r2.top - e.panY) / e.zoom;
+        e.render();
+      }
+      return;
+    }
 
     // Panning
     if (e.panning && e.ds) {
@@ -570,6 +620,20 @@ export default function EditorPage() {
     // End marquee
     if (e.marqueeActive) {
       e.endMarquee(ev.shiftKey || ev.metaKey);
+      refP(e);
+      return;
+    }
+
+    // End linking — try to complete connection to target node
+    if (e.linking && e.mode === "flowchart") {
+      const target = e.hitN(ev.clientX, ev.clientY);
+      if (target && target.id !== e.linking) {
+        e.pu();
+        e.conns.push(e.mkConn(e.linking, target.id, e.linkStyle));
+        toast("连线已创建");
+      }
+      e.linking = null;
+      e.render();
       refP(e);
       return;
     }
@@ -866,6 +930,28 @@ export default function EditorPage() {
             </button>
           ))}
         </div>
+
+        {/* Link style — only show in flowchart mode */}
+        {eng?.mode === "flowchart" && (
+          <>
+            <Separator orientation="vertical" className="h-6 mx-1" />
+            <div className="flex items-center gap-0.5">
+              <span className="text-[10px] text-gray-400 mr-0.5">连线</span>
+              {([
+                { id: "orthogonal", label: "折线" },
+                { id: "straight", label: "直线" },
+                { id: "curved", label: "曲线" },
+              ] as const).map(ls => (
+                <button key={ls.id}
+                  onClick={() => setLinkStyle(ls.id)}
+                  className={`h-6 px-2 text-[10px] rounded transition-colors ${linkStyle === ls.id ? "bg-indigo-100 text-indigo-700 font-medium" : "text-gray-500 hover:bg-gray-100"}`}
+                >
+                  {ls.label}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
 
         <Separator orientation="vertical" className="h-6 mx-1" />
 
