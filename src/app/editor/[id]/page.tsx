@@ -362,7 +362,11 @@ export default function EditorPage() {
     e.linking = null; e.sel.clear(); e.selConn = null;
     e.clickStartNodeId = null; e.clickStartX = 0; e.clickStartY = 0;
     e.pu();
-    const n = e.crFlowNode(type, 300 + Math.random() * 100, 200 + Math.random() * 100);
+    // 使用画布可见区域中心作为新图形位置
+    const wrap = wrapRef.current;
+    const cx = wrap ? (wrap.clientWidth / 2 - e.panX) / e.zoom : 300;
+    const cy = wrap ? (wrap.clientHeight / 2 - e.panY) / e.zoom : 200;
+    const n = e.crFlowNode(type, cx - 60, cy - 25);
     e.nodes.push(n); e.selN(n.id);
     e.render(); refP(e); toast("已添加: " + n.text);
   }, [refP, toast]);
@@ -419,21 +423,38 @@ export default function EditorPage() {
         return;
       }
       if (e.freeDrawSubTool === "text") {
-        const n = e.addTextAt(cpx - 70, cpy - 20, "双击编辑");
-        e.selN(n.id);
-        refP(e);
-        // Open inline edit
-        if (ieRef.current && canvasRef.current) {
+        // 先检查是否点击在已有节点上，避免重复创建
+        const hn = e.hitN(ev.clientX, ev.clientY);
+        if (hn && ieRef.current && canvasRef.current) {
+          // 点击已有节点 → 直接打开编辑
+          e.selN(hn.id);
           ieRef.current.style.display = "block";
-          ieRef.current.value = n.text || "";
-          ieRef.current.style.left = (n.x * e.zoom + e.panX) + "px";
-          ieRef.current.style.top = (n.y * e.zoom + e.panY) + "px";
-          ieRef.current.style.width = Math.max(n.width * e.zoom, 80) + "px";
-          ieRef.current.style.height = Math.max(n.height * e.zoom, 28) + "px";
-          ieRef.current.style.fontSize = (n.fs * e.zoom) + "px";
+          ieRef.current.value = hn.text || "";
+          ieRef.current.style.left = (hn.x * e.zoom + e.panX) + "px";
+          ieRef.current.style.top = (hn.y * e.zoom + e.panY) + "px";
+          ieRef.current.style.width = Math.max(hn.width * e.zoom, 80) + "px";
+          ieRef.current.style.height = Math.max(hn.height * e.zoom, 28) + "px";
+          ieRef.current.style.fontSize = (hn.fs * e.zoom) + "px";
           ieRef.current.focus();
           ieRef.current.select();
-          ieRef.current.dataset.nodeId = n.id;
+          ieRef.current.dataset.nodeId = hn.id;
+        } else {
+          // 空白区域 → 创建新文本节点
+          const n = e.addTextAt(cpx - 70, cpy - 20, "双击编辑");
+          e.selN(n.id);
+          refP(e);
+          if (ieRef.current && canvasRef.current) {
+            ieRef.current.style.display = "block";
+            ieRef.current.value = n.text || "";
+            ieRef.current.style.left = (n.x * e.zoom + e.panX) + "px";
+            ieRef.current.style.top = (n.y * e.zoom + e.panY) + "px";
+            ieRef.current.style.width = Math.max(n.width * e.zoom, 80) + "px";
+            ieRef.current.style.height = Math.max(n.height * e.zoom, 28) + "px";
+            ieRef.current.style.fontSize = (n.fs * e.zoom) + "px";
+            ieRef.current.focus();
+            ieRef.current.select();
+            ieRef.current.dataset.nodeId = n.id;
+          }
         }
         return;
       }
